@@ -1,0 +1,16 @@
+#[path = "../../../../../nostr-multi-platform/crates/nmp-cli/registry/tui/content-kind-registry/mod.rs"]
+pub mod content_kind_registry;
+#[path = "../../../../../nostr-multi-platform/crates/nmp-cli/registry/tui/content-core/content_render_data.rs"]
+pub mod content_render_data;
+#[path = "../../../../../nostr-multi-platform/crates/nmp-cli/registry/tui/content-core/content_tree_wire.rs"]
+pub mod content_tree_wire;
+#[path = "../../../../../nostr-multi-platform/crates/nmp-cli/registry/tui/content-view/nostr_content_view.rs"]
+pub mod nostr_content_view;
+#[path = "../../../../../nostr-multi-platform/crates/nmp-cli/registry/tui/content-media-grid/nostr_media_grid.rs"]
+pub mod nostr_media_grid;
+#[path = "../../../../../nostr-multi-platform/crates/nmp-cli/registry/tui/content-mention-chip/nostr_mention_chip.rs"]
+pub mod nostr_mention_chip;
+#[path = "../../../../../nostr-multi-platform/crates/nmp-cli/registry/tui/content-minimal/nostr_minimal_content.rs"]
+pub mod nostr_minimal_content;
+#[path = "../../../../../nostr-multi-platform/crates/nmp-cli/registry/tui/content-core/ratatui_text_wrap.rs"]
+pub mod ratatui_text_wrap;

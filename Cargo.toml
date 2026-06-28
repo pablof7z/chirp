@@ -1,0 +1,19 @@
+[workspace]
+members = [
+    "crates/nmp-app-chirp",
+    "crates/nmp-chirp-config",
+    "crates/nmp-chirp-android-ffi",
+    "chirp-tui",
+    "chirp-desktop",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/pablof7z/chirp"
+version = "0.8.4"
+
+[workspace.dependencies]
+flatbuffers = "25.12.19"
+zeroize = { version = "1", features = ["derive"] }

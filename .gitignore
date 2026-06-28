@@ -1,0 +1,23 @@
+/target/
+node_modules/
+dist/
+
+# Xcode build output
+ios/build/
+ios/DerivedData/
+ios/DerivedData-maestro/
+ios/Chirp/App/BuildInfo.generated.swift
+ios/Chirp.xcodeproj/xcuserdata/
+ios/Chirp.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Android Gradle output
+android/.gradle/
+android/app/build/
+android/app/src/main/jniLibs/
+
+# Instruments traces
+*.trace/
+*.trace
+
+# Vercel
+.vercel
