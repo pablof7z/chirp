@@ -3,8 +3,8 @@ members = [
     "crates/nmp-app-chirp",
     "crates/nmp-chirp-config",
     "crates/nmp-chirp-android-ffi",
-    "chirp-tui",
-    "chirp-desktop",
+    "apps/tui",
+    "apps/desktop",
 ]
 resolver = "2"
 
@@ -17,3 +17,30 @@ version = "0.8.4"
 [workspace.dependencies]
 flatbuffers = "25.12.19"
 zeroize = { version = "1", features = ["derive"] }
+
+# NMP framework — all chirp crates depend on NMP via git; no local clone required.
+nmp-codegen        = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-content        = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-core           = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-defaults       = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-feed           = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-ffi            = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-kinds          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-marmot         = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-native-runtime = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-nip01          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-nip02          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-nip05          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-nip17          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-nip18          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-nip25          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-nip29          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-nip47          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-nip57          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-nip59          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-nip89          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-planner        = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-relations      = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-router         = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-store          = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }
+nmp-threading      = { git = "https://github.com/pablof7z/nostr-multi-platform", branch = "master" }

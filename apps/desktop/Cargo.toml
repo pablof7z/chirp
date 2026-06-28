@@ -12,31 +12,31 @@ path = "src/main.rs"
 [dependencies]
 # Chirp composition root — brings in modular timeline, DM inbox, follow list,
 # action modules, and all per-app FFI symbols. Same feature set as chirp-tui.
-nmp-app-chirp = { path = "../crates/nmp-app-chirp", default-features = false, features = ["marmot", "wallet"] }
+nmp-app-chirp = { path = "../../crates/nmp-app-chirp", default-features = false, features = ["marmot", "wallet"] }
 
 # Shared Chirp app configuration — relay bootstrap defaults.
-nmp-chirp-config = { path = "../crates/nmp-chirp-config" }
+nmp-chirp-config = { path = "../../crates/nmp-chirp-config" }
 
 # C-ABI surface (NmpApp, nmp_app_* symbols).
-nmp-ffi = { path = "../../nostr-multi-platform/crates/nmp-ffi" }
-nmp-feed = { path = "../../nostr-multi-platform/crates/nmp-feed" }
+nmp-ffi = { workspace = true }
+nmp-feed = { workspace = true }
 
 # In-process kernel: we still decode FlatBuffer frames and use display helpers.
-nmp-core = { path = "../../nostr-multi-platform/crates/nmp-core" }
+nmp-core = { workspace = true }
 
 # NIP-01 typed OP-feed codec: decode_op_feed_snapshot + OP_FEED_SCHEMA_ID for
 # the typed sidecar render cutover (ADR-0038).
-nmp-nip01 = { path = "../../nostr-multi-platform/crates/nmp-nip01" }
+nmp-nip01 = { workspace = true }
 
 # NIP-02 typed follow-list codec: decode nmp.follow_list for profile buttons.
-nmp-nip02 = { path = "../../nostr-multi-platform/crates/nmp-nip02" }
+nmp-nip02 = { workspace = true }
 
 # NIP-17 typed DM-inbox codec: decode_dm_inbox_snapshot for the
 # "nmp.nip17.dm_inbox" sidecar (PR-B typed-first migration, #991/#979).
-nmp-nip17 = { path = "../../nostr-multi-platform/crates/nmp-nip17" }
+nmp-nip17 = { workspace = true }
 
 # Content IR consumed directly in-process (Rust→Rust, no wire projection).
-nmp-content = { path = "../../nostr-multi-platform/crates/nmp-content" }
+nmp-content = { workspace = true }
 
 eframe = "0.29"
 egui   = "0.29"
@@ -48,5 +48,5 @@ zeroize = { workspace = true }
 keyring = { version = "3.6.3", default-features = false, features = ["apple-native", "windows-native", "linux-native"] }
 
 [dev-dependencies]
-nmp-core = { path = "../../nostr-multi-platform/crates/nmp-core", features = ["test-support"] }
-nmp-ffi = { path = "../../nostr-multi-platform/crates/nmp-ffi", features = ["test-support"] }
+nmp-core = { workspace = true, features = ["test-support"] }
+nmp-ffi = { workspace = true, features = ["test-support"] }
