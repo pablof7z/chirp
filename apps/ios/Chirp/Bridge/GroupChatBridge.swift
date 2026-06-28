@@ -30,9 +30,11 @@ import os.log
 // ── Write side ────────────────────────────────────────────────────────────
 //
 //   • `postChatMessage(groupId:content:)` dispatches the
-//     `nmp.nip29.publish_group_event` action through the Chirp byte doorway
-//     (`nmp_app_chirp_dispatch_action_bytes`). Fire-and-forget — the outcome
-//     surfaces through the next snapshot tick (matches `react` / `follow`).
+//     `nmp.nip29.publish_group_event` action via the typed byte doorway
+//     (`nmp_app_dispatch_action_bytes`, generated builder #2170). Fire-and-
+//     forget — the outcome surfaces through the next snapshot tick.
+//   • `reactToMessage` and `replyToMessage` still ride the legacy Chirp
+//     byte doorway (react_in_group / comment_in_group are not yet migrated).
 // ─────────────────────────────────────────────────────────────────────────
 
 private let gcLog = Logger(subsystem: "io.f7z.chirp", category: "GroupChatBridge")
@@ -96,20 +98,23 @@ extension KernelHandle {
 
     /// Dispatch a `nmp.nip29.publish_group_event` action to publish a kind:9 group
     /// chat message — chat is just one event kind on the generic group-publish
-    /// surface. Routes through the Chirp byte doorway
-    /// (`nmp_app_chirp_dispatch_action_bytes`); the event, its `["h", local_id]`
-    /// and `["previous", …]` envelope tags, and signing are all owned by Rust
-    /// (thin-shell rule). Fire-and-forget: the returned correlation JSON is freed
-    /// and ignored — the published message surfaces through the next
+    /// surface. Routes through the typed byte doorway
+    /// (`nmp_app_dispatch_action_bytes`, M14-1 / #2145 / #2170); the event, its
+    /// `["h", local_id]` and `["previous", …]` envelope tags, and signing are all
+    /// owned by Rust (thin-shell rule). Fire-and-forget: the returned correlation
+    /// JSON is freed and ignored — the published message surfaces through the next
     /// `nip29.group_events` snapshot tick (matches the `react` / `follow` /
     /// `publishNote` pattern).
     func postChatMessage(groupId: GroupId, content: String) {
-        let payload: [String: Any] = [
-            "group": groupId.jsonObject,
-            "kind": 9,
-            "content": content,
-        ]
-        dispatchPostChatMessage(payload: payload)
+        let id = UUID().uuidString
+        let bytes = GeneratedActionBuilders.publishGroupEvent(
+            correlationId: id,
+            group: (hostRelayUrl: groupId.hostRelayUrl, localId: groupId.localId),
+            kind: 9,
+            content: content,
+            tags: nil
+        )
+        _ = dispatchBytes(bytes)
     }
 
     /// Dispatch a `nmp.nip29.react_in_group` action — publish a kind:7 in-group
@@ -156,11 +161,6 @@ extension KernelHandle {
             "content": content,
         ]
         dispatchCommentInGroup(payload: payload)
-    }
-
-    private func dispatchPostChatMessage(payload: [String: Any]) {
-        dispatchGroupChatAction(
-            "nmp.nip29.publish_group_event", payload: payload, label: "postChatMessage")
     }
 
     private func dispatchReactInGroup(payload: [String: Any]) {
