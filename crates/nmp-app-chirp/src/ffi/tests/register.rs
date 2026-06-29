@@ -8,15 +8,17 @@
 
 use std::ffi::CString;
 
-use nmp_ffi::{nmp_app_free, nmp_app_new};
+use crate::{nmp_app_free, nmp_app_new};
 
-use super::super::{nmp_app_chirp_register, nmp_app_chirp_unregister, ChirpHandle, NmpRegisterStatus};
+use super::super::{
+    nmp_app_chirp_register, nmp_app_chirp_unregister, ChirpHandle, NmpRegisterStatus,
+};
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 /// Call `nmp_app_chirp_register` and return `(status_u32, handle)`.
 fn reg(
-    app: *mut nmp_ffi::NmpApp,
+    app: *mut nmp_native_runtime::NmpApp,
     viewer: *const std::ffi::c_char,
 ) -> (u32, *mut ChirpHandle) {
     let mut handle: *mut ChirpHandle = std::ptr::null_mut();
@@ -125,8 +127,7 @@ fn valid_hex_viewer_pubkey_succeeds() {
     // 64 lowercase hex chars — a syntactically valid pubkey (value need not
     // resolve to a live Nostr identity for this test).
     let valid_pubkey =
-        CString::new("deadbeefcafe0123456789abcdef0123456789abcdef0123456789abcdef0123")
-            .unwrap();
+        CString::new("deadbeefcafe0123456789abcdef0123456789abcdef0123456789abcdef0123").unwrap();
     let app = nmp_app_new();
     let (status, handle) = reg(app, valid_pubkey.as_ptr());
     assert_eq!(
@@ -148,8 +149,7 @@ fn valid_hex_viewer_pubkey_succeeds() {
 #[test]
 fn uppercase_hex_viewer_pubkey_is_accepted() {
     let upper_pubkey =
-        CString::new("DEADBEEFCAFE0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123")
-            .unwrap();
+        CString::new("DEADBEEFCAFE0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123").unwrap();
     let app = nmp_app_new();
     let (status, handle) = reg(app, upper_pubkey.as_ptr());
     // `is_hex_pubkey` accepts both cases — behaviour documented here, not

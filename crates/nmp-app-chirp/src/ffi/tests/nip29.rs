@@ -3,10 +3,10 @@
 //! Registration wiring proofs (group-chat + discovery lifecycle) live in the
 //! sibling `nip29_registration` module to keep each file under the 500-LOC cap.
 
+use crate::{nmp_app_free, nmp_app_new};
 use nmp_core::actor::ActorCommand;
 use nmp_core::actor::{ActionLedgerCommand, InterestsCommand, PublishCommand};
 use nmp_core::substrate::{ActionContext, ActionModule};
-use nmp_ffi::{nmp_app_free, nmp_app_new};
 use nmp_nip29::action::{
     CreatePublicGroupAction, DiscoverGroupsAction, DiscoverGroupsInput, JoinGroupAction,
     JoinGroupInput, PublishGroupEventAction, PublishGroupEventInput, ReactInGroupAction,
@@ -361,18 +361,14 @@ fn nip29_join_executor_emits_kind_9021_with_host_pin() {
         }) => {
             assert_eq!(relays, vec!["wss://groups.example.com".to_string()]);
             assert_eq!(event.kind, 9021);
-            assert!(
-                event
-                    .tags
-                    .iter()
-                    .any(|t| t == &vec!["h".to_string(), "room".to_string()])
-            );
-            assert!(
-                event
-                    .tags
-                    .iter()
-                    .any(|t| t == &vec!["code".to_string(), "abc".to_string()])
-            );
+            assert!(event
+                .tags
+                .iter()
+                .any(|t| t == &vec!["h".to_string(), "room".to_string()]));
+            assert!(event
+                .tags
+                .iter()
+                .any(|t| t == &vec!["code".to_string(), "abc".to_string()]));
             assert_eq!(event.content, "please");
             // correlation_id threads through from the executor.
             assert!(

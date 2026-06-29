@@ -1,4 +1,4 @@
-use std::ffi::{c_void, CStr, CString};
+use std::ffi::{CStr, CString};
 use std::ptr;
 
 use nmp_app_chirp::ffi::{
@@ -6,16 +6,14 @@ use nmp_app_chirp::ffi::{
     nmp_app_chirp_register_group_events,
 };
 use nmp_app_chirp::{
-    nmp_app_cancel_bunker_handshake, nmp_app_chirp_create_new_account,
+    nmp_app_cancel_action, nmp_app_cancel_bunker_handshake, nmp_app_chirp_create_new_account,
     nmp_app_chirp_identity_sign_in_nsec, nmp_app_chirp_open_tag_feed, nmp_app_nostrconnect_uri,
-    nmp_marmot_register_active, nmp_marmot_unregister, send_dm_spec, zap_identifier_spec, zap_spec,
+    nmp_app_remove_account, nmp_app_remove_relay, nmp_app_retry_publish, nmp_app_signin_bunker,
+    nmp_app_signin_nsec, nmp_app_switch_active, nmp_free_string, nmp_marmot_register_active,
+    nmp_marmot_unregister, send_dm_spec, zap_identifier_spec, zap_spec,
 };
 use nmp_app_chirp::{nmp_app_chirp_close_group_discovery, nmp_app_chirp_open_group_discovery};
 use nmp_chirp_config::CHIRP_MARMOT_KEYRING_SERVICE_ID;
-use nmp_ffi::{
-    nmp_app_cancel_action, nmp_app_remove_relay, nmp_app_retry_publish, nmp_app_signin_nsec,
-    nmp_free_string,
-};
 use serde_json::{json, Value};
 
 use crate::runtime::AppRuntime;
@@ -23,11 +21,6 @@ use crate::Result;
 
 // #1607: nmp_app_wallet_{connect,disconnect,pay_invoice} deleted from the C ABI.
 // All wallet operations now route through nmp_app_dispatch_action (D11).
-unsafe extern "C" {
-    fn nmp_app_remove_account(app: *mut c_void, identity_id: *const std::ffi::c_char);
-    fn nmp_app_signin_bunker(app: *mut c_void, uri: *const std::ffi::c_char, make_active: u8);
-    fn nmp_app_switch_active(app: *mut c_void, identity_id: *const std::ffi::c_char);
-}
 
 impl AppRuntime {
     pub fn sign_in_nsec(&self, nsec: &str) -> Result<()> {
@@ -51,8 +44,8 @@ impl AppRuntime {
 
     pub fn sign_in_bunker(&self, uri: &str) -> Result<()> {
         self.unregister_marmot();
-        self.with_cstr(uri, |c| unsafe {
-            nmp_app_signin_bunker(self.app_ptr().cast(), c.as_ptr(), 1)
+        self.with_cstr(uri, |c| {
+            nmp_app_signin_bunker(self.app_ptr(), c.as_ptr(), 1)
         })
     }
 
@@ -85,15 +78,15 @@ impl AppRuntime {
 
     pub fn switch_account(&self, identity_id: &str) -> Result<()> {
         self.unregister_marmot();
-        self.with_cstr(identity_id, |c| unsafe {
-            nmp_app_switch_active(self.app_ptr().cast(), c.as_ptr())
+        self.with_cstr(identity_id, |c| {
+            nmp_app_switch_active(self.app_ptr(), c.as_ptr())
         })
     }
 
     pub fn remove_account(&self, identity_id: &str) -> Result<()> {
         self.unregister_marmot();
-        self.with_cstr(identity_id, |c| unsafe {
-            nmp_app_remove_account(self.app_ptr().cast(), c.as_ptr())
+        self.with_cstr(identity_id, |c| {
+            nmp_app_remove_account(self.app_ptr(), c.as_ptr())
         })
     }
 
@@ -312,7 +305,10 @@ impl AppRuntime {
             .map_err(|_| "marmot service id contains NUL byte".to_string())?;
         let handle = nmp_marmot_register_active(self.app_ptr(), dir.as_ptr(), svc.as_ptr());
         if handle.is_null() {
-            return Err("no active Marmot identity".to_string());
+            return Err(
+                "Marmot active registration is blocked by pablof7z/nostr-multi-platform#2495"
+                    .to_string(),
+            );
         }
         self.marmot.set(handle);
         Ok(())
@@ -320,15 +316,9 @@ impl AppRuntime {
 
     pub fn marmot_dispatch_json(&self, action: Value) -> Result<String> {
         self.marmot_register_active()?;
-        // ADR-0025 PR 3 (2026-05-23): the legacy bespoke `nmp_marmot_dispatch`
-        // C-ABI symbol was deleted. iOS routes Marmot ops through
-        // `nmp_app_dispatch_action("nmp.marmot", …)`, but that path returns
-        // only `{"correlation_id":"…"}` — the rich per-op envelope the TUI
-        // surfaces to the operator (`ok`, per-op detail) is dropped. The
-        // Rust-native `MarmotHandle::dispatch` accessor reaches the SAME
-        // `ops::dispatch` entry point both seams use, without any C-ABI in
-        // the loop. See `crates/chirp-repl/src/app.rs::marmot_dispatch` for
-        // the parallel migration.
+        // NMP #2495 currently prevents this path from obtaining a non-null
+        // handle. If that seam is restored, dispatch must still route through
+        // the NMP-owned Marmot handle instead of app-local protocol code.
         //
         // SAFETY: `marmot_register_active` guarantees `self.marmot.get()` is
         // non-null (it returns `Err` otherwise); the handle was boxed by
@@ -363,10 +353,9 @@ impl AppRuntime {
 
     pub fn marmot_snapshot_text(&self) -> Result<String> {
         self.marmot_register_active()?;
-        // V-107 / ADR-0039: use the Rust-native accessor on the MarmotHandle
-        // instead of the deprecated C-ABI pull symbol `nmp_marmot_snapshot`.
-        // Same data path as the push projection `"nmp.marmot.snapshot"` on the
-        // SnapshotFrame.
+        // NMP #2495 currently prevents this path from obtaining a non-null
+        // handle. Snapshot reads stay behind the NMP-owned Marmot handle when
+        // the architecture seam returns.
         //
         // SAFETY: `self.marmot.get()` is non-null (guaranteed by
         // `marmot_register_active()` returning Ok above).

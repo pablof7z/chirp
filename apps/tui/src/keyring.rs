@@ -195,7 +195,12 @@ mod tests {
 
         // Missing → not_found.
         assert_eq!(
-            execute_in(KeyringRequest::Retrieve { account_id: account.to_string() }, &base),
+            execute_in(
+                KeyringRequest::Retrieve {
+                    account_id: account.to_string()
+                },
+                &base
+            ),
             KeyringResult::not_found()
         );
 
@@ -213,19 +218,34 @@ mod tests {
 
         // Retrieve → ok(secret).
         assert_eq!(
-            execute_in(KeyringRequest::Retrieve { account_id: account.to_string() }, &base),
+            execute_in(
+                KeyringRequest::Retrieve {
+                    account_id: account.to_string()
+                },
+                &base
+            ),
             KeyringResult::ok(Some(secret.to_string()))
         );
 
         // Delete → ok.
         assert_eq!(
-            execute_in(KeyringRequest::Delete { account_id: account.to_string() }, &base),
+            execute_in(
+                KeyringRequest::Delete {
+                    account_id: account.to_string()
+                },
+                &base
+            ),
             KeyringResult::ok(None)
         );
 
         // Deleting again (missing) → still ok.
         assert_eq!(
-            execute_in(KeyringRequest::Delete { account_id: account.to_string() }, &base),
+            execute_in(
+                KeyringRequest::Delete {
+                    account_id: account.to_string()
+                },
+                &base
+            ),
             KeyringResult::ok(None)
         );
 

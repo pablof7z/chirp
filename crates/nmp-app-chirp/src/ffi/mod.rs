@@ -34,9 +34,9 @@
 //!   `nmp-chirp-android-ffi::relay_seeding` glue.
 //! - `nmp_app_chirp_identity_restore`,
 //!   `nmp_app_chirp_identity_sign_in_nsec`, and
-//!   `nmp_app_chirp_identity_remove_account` — Chirp-owned identity wrappers
-//!   that register the reusable Marmot projection without leaking Chirp symbol
-//!   policy into `nmp-marmot`.
+//!   `nmp_app_chirp_identity_remove_account` — Chirp-owned identity symbols.
+//!   They sign in/remove accounts through NMP and keep Marmot fail-closed until
+//!   pablof7z/nostr-multi-platform#2495 restores the active-registration seam.
 //!
 //! ## Doctrine
 //!
@@ -62,8 +62,6 @@ mod feed;
 mod group;
 mod handle;
 mod helpers;
-#[cfg(feature = "marmot")]
-mod identity;
 mod register;
 mod relay_seeding;
 mod snapshot;
@@ -77,17 +75,17 @@ pub use create_account::nmp_app_chirp_create_new_account;
 pub use declared_projections::nmp_app_chirp_declare_consumed_projections;
 // #1740 step 7 — the ONE public app-facing feed doorway (typed params in,
 // opaque handle out). Replaces per-feed-type opens with a single generic entry.
-pub use feed::{nmp_app_close_feed, nmp_app_open_feed};
-pub use group::{
-    nmp_app_chirp_close_group_discovery, nmp_app_chirp_open_group_discovery,
-    nmp_app_chirp_register_group_events, nmp_app_chirp_unregister_group_events,
-};
-pub use handle::ChirpHandle;
 #[cfg(feature = "marmot")]
-pub use identity::{
+pub use crate::native_ffi::{
     nmp_app_chirp_identity_remove_account, nmp_app_chirp_identity_restore,
     nmp_app_chirp_identity_sign_in_nsec,
 };
+pub use feed::{nmp_app_close_feed, nmp_app_open_feed};
+pub use group::{
+    nmp_app_chirp_close_group_discovery, nmp_app_chirp_open_group_discovery,
+    nmp_app_chirp_register_group_events, nmp_app_chirp_unregister_group_events, GroupFeedHandle,
+};
+pub use handle::ChirpHandle;
 pub use register::{
     nmp_app_chirp_register, nmp_app_chirp_register_dm_inbox, nmp_app_chirp_register_follow_list,
     NmpRegisterStatus,

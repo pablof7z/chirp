@@ -41,16 +41,7 @@ nmp-nip02 = { workspace = true }
 nmp-nip17 = { workspace = true }
 nmp-nip29 = { workspace = true }
 nmp-nip47 = { workspace = true }
-# C-ABI surface (`NmpApp`, `nmp_app_*` symbols) — extracted from
-# `nmp-core::ffi` in step 11-final.
-# V-38: nmp-core no longer has a `wallet` feature; nmp-ffi exposes wallet
-# shims unconditionally that route through dispatch_action to `nmp-nip47`.
-# Runtime needs only the default `native` C-ABI surface (e.g.
-# `nmp_app_ack_action_stage`, which is `native`-gated — NOT test-support). The
-# `nmp_app_inject_*` / `nmp_app_read_projection_*` injectors are test-support and
-# are reached only by the cfg(test) round-trip test, so test-support is re-pinned
-# under [dev-dependencies] below rather than on the shipping binary.
-nmp-ffi = { workspace = true }
+nmp-native-runtime = { workspace = true }
 nmp-feed = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 color-eyre = "0.6"
@@ -67,13 +58,11 @@ ureq = { version = "2", default-features = false, features = ["tls", "json"] }
 [dev-dependencies]
 insta = { version = "1", features = ["yaml"] }
 # `test-support` re-pin — TEST-ONLY. Enables nmp-core's `testing::spawn_actor` /
-# `ActorCommand` and the nmp-ffi `nmp_app_inject_*` injectors that the cfg(test)
-# round-trip test drives, AND the ADR-0055 projection-rev oracle (so the test
-# suite still fails loud on a missed stamp). Because these live in
-# [dev-dependencies], `cargo build`/`cargo run` of the binary never link them —
-# the oracle is present for `cargo test` only.
+# `ActorCommand` and native-runtime test helpers that cfg(test) round-trip tests
+# drive. Because these live in [dev-dependencies], `cargo build`/`cargo run` of
+# the binary never link them.
 nmp-core = { workspace = true, features = ["test-support"] }
-nmp-ffi = { workspace = true, features = ["test-support"] }
+nmp-native-runtime = { workspace = true, features = ["test-support"] }
 # PR-B round-trip test: drives a REAL kernel actor (nmp_core::testing::spawn_actor)
 # and signs in with a local nsec, so the frame under test comes from the
 # production encoder (`encode_snapshot_with_envelope`).

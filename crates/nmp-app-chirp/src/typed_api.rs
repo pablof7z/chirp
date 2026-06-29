@@ -2,7 +2,7 @@
 //!
 //! Provides a high-level [`ChirpClient`] struct that dispatches Chirp write
 //! operations through the typed **byte** doorway
-//! ([`nmp_ffi::nmp_app_dispatch_action_bytes`], ADR-0064). Shells (TUI, desktop,
+//! ([`nmp_native_runtime::nmp_app_dispatch_action_bytes`], ADR-0064). Shells (TUI, desktop,
 //! Android, iOS) call typed methods like `publish_note()` instead of manually
 //! building action bodies. Each method builds the canonical action body via the
 //! `crate::action_specs` builders, then hands it to the shared
@@ -22,13 +22,13 @@ use crate::action_specs::{
     follow_spec, publish_note_spec, publish_profile_spec, publish_relay_list_spec, react_spec,
     repost_spec, send_dm_spec, unfollow_spec, zap_spec,
 };
-use nmp_ffi::NmpApp;
+use nmp_native_runtime::NmpApp;
 use nmp_nip01::NoteRecord;
 
 /// Typed Chirp action client.
 ///
 /// Dispatches Chirp write operations through the typed byte doorway
-/// ([`nmp_ffi::nmp_app_dispatch_action_bytes`], via the shared
+/// ([`nmp_native_runtime::nmp_app_dispatch_action_bytes`], via the shared
 /// [`crate::dispatch_bytes`] seam) and owns the task of constructing the
 /// canonical action body for each verb. Shells create one per app lifecycle and
 /// call typed methods instead of hand-assembling action payloads.
@@ -57,7 +57,7 @@ impl ChirpClient {
     ///
     /// # Safety
     ///
-    /// `app` must be a valid, non-null pointer from [`nmp_ffi::nmp_app_new`].
+    /// `app` must be a valid, non-null pointer from [`nmp_native_runtime::nmp_app_new`].
     pub const fn new(app: *mut NmpApp) -> Self {
         Self { app }
     }
@@ -69,7 +69,7 @@ impl ChirpClient {
     /// produced; the shared [`crate::dispatch_bytes`] seam converts it into the
     /// `namespace`'s typed [`ActionPayload`](nmp_core::substrate::ActionPayload)
     /// bytes, wraps them in a host-minted dispatch envelope, and calls
-    /// [`nmp_ffi::nmp_app_dispatch_action_bytes`]. The JSON never crosses the
+    /// [`nmp_native_runtime::nmp_app_dispatch_action_bytes`]. The JSON never crosses the
     /// FFI — only typed payload bytes do (ADR-0064 / Cut-B, #1756).
     ///
     /// Returns the action's correlation ID (the host-minted id echoed by the

@@ -159,12 +159,12 @@ fn append_card(
         let pad = pad_for(content_width, used);
         lines.push(Line::from(vec![
             gutter_span.clone(),
-            Span::styled(prefix.to_string(), Style::default().fg(REPLY_COLOR).bg(row_bg)),
-            name_span,
             Span::styled(
-                suffix.to_string(),
-                Style::default().fg(DIM_TEXT).bg(row_bg),
+                prefix.to_string(),
+                Style::default().fg(REPLY_COLOR).bg(row_bg),
             ),
+            name_span,
+            Span::styled(suffix.to_string(), Style::default().fg(DIM_TEXT).bg(row_bg)),
             Span::styled(pad, Style::default().bg(row_bg)),
         ]));
     }

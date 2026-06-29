@@ -1,6 +1,6 @@
 //! NIP-17 DM send dispatch proof + DM-inbox host registration tests.
 
-use nmp_ffi::{nmp_app_free, nmp_app_new};
+use crate::{nmp_app_free, nmp_app_new};
 
 use super::super::{nmp_app_chirp_register_dm_inbox, nmp_app_chirp_unregister};
 use super::helpers::{dispatch, register_app};

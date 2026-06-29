@@ -25,7 +25,7 @@
 //! into the social verbs is `nmp_app_dispatch_action` under the
 //! `nmp.follow` / `nmp.unfollow` / `nmp.nip25.react` namespaces.
 
-use nmp_ffi::NmpApp;
+use nmp_native_runtime::NmpApp;
 
 /// Register the NIP-29 group-chat action namespaces against `app`'s
 /// action registry.

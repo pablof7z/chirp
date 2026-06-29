@@ -35,7 +35,10 @@ fn new_recipient_row(app: &mut DesktopApp, ui: &mut Ui, signed_in: bool) {
 
         let recipient = app.new_dm_pubkey.trim();
         if ui
-            .add_enabled(signed_in && !recipient.is_empty(), egui::Button::new("Open"))
+            .add_enabled(
+                signed_in && !recipient.is_empty(),
+                egui::Button::new("Open"),
+            )
             .clicked()
         {
             app.selected_dm_pubkey = Some(recipient.to_string());
@@ -43,7 +46,11 @@ fn new_recipient_row(app: &mut DesktopApp, ui: &mut Ui, signed_in: bool) {
     });
 
     if !signed_in {
-        ui.label(RichText::new("Sign in to send encrypted direct messages.").small().weak());
+        ui.label(
+            RichText::new("Sign in to send encrypted direct messages.")
+                .small()
+                .weak(),
+        );
     }
 }
 
@@ -78,7 +85,11 @@ fn conversation_detail(
     let Some(selected_pubkey) = app.selected_dm_pubkey.clone() else {
         ui.vertical_centered(|ui| {
             ui.add_space(40.0);
-            ui.label(RichText::new("Select or open a conversation").size(14.0).weak());
+            ui.label(
+                RichText::new("Select or open a conversation")
+                    .size(14.0)
+                    .weak(),
+            );
         });
         return;
     };

@@ -5,20 +5,19 @@ use std::sync::mpsc::Receiver;
 
 use nmp_app_chirp::ffi::{nmp_app_chirp_register_dm_inbox, nmp_app_chirp_register_follow_list};
 use nmp_app_chirp::{
-    follow_spec, nmp_app_chirp_close_group_discovery, nmp_app_chirp_declare_consumed_projections,
-    nmp_app_chirp_identity_restore, nmp_app_chirp_register, nmp_app_chirp_unregister,
+    follow_spec, nmp_app_ack_action_stage, nmp_app_add_relay, nmp_app_chirp_close_group_discovery,
+    nmp_app_chirp_declare_consumed_projections, nmp_app_chirp_identity_restore,
+    nmp_app_chirp_register, nmp_app_chirp_unregister, nmp_app_free, nmp_app_load_older_feed,
+    nmp_app_new, nmp_app_release_profile_ref, nmp_app_resolve_profile_card_live,
+    nmp_app_resolve_profile_ref, nmp_app_set_capability_callback, nmp_app_start,
     nmp_marmot_unregister, nmp_signer_broker_init, publish_note_action, react_spec, repost_spec,
-    unfollow_spec, ChirpHandle, MarmotHandle, NmpRegisterStatus,
+    unfollow_spec, ChirpHandle, GroupFeedHandle, MarmotHandle, NmpRegisterStatus,
 };
 use nmp_core::tags::Nip10Refs;
 use nmp_nip01::NoteRecord;
 
 use crate::app::ReplyTarget;
-use nmp_ffi::{
-    nmp_app_free, nmp_app_load_older_feed, nmp_app_release_profile_ref,
-    nmp_app_resolve_profile_card_live, nmp_app_resolve_profile_ref, nmp_app_start, GroupFeedHandle,
-    NmpApp, NmpConfigStatus,
-};
+use nmp_native_runtime::{NmpApp, NmpConfigStatus};
 use serde_json::{json, Value};
 
 use crate::bridge::{self, NmpEvent, NmpUpdateBridge};
@@ -49,7 +48,7 @@ pub struct AppRuntime {
 impl AppRuntime {
     #[must_use]
     pub fn new() -> Result<(Self, Receiver<NmpEvent>)> {
-        let app = nmp_ffi::nmp_app_new();
+        let app = nmp_app_new();
         if app.is_null() {
             return Err("nmp_app_new returned null".to_string());
         }
@@ -61,7 +60,7 @@ impl AppRuntime {
             ));
         }
 
-        nmp_ffi::nmp_app_set_capability_callback(
+        nmp_app_set_capability_callback(
             app,
             ptr::null_mut(),
             Some(crate::keyring::keyring_handler),
@@ -126,7 +125,7 @@ impl AppRuntime {
     pub fn add_relay(&self, url: &str, role: &str) -> Result<()> {
         let url = CString::new(url).map_err(|_| "relay URL contains NUL byte".to_string())?;
         let role = CString::new(role).map_err(|_| "relay role contains NUL byte".to_string())?;
-        nmp_ffi::nmp_app_add_relay(self.app, url.as_ptr(), role.as_ptr());
+        nmp_app_add_relay(self.app, url.as_ptr(), role.as_ptr());
         Ok(())
     }
 
@@ -228,7 +227,7 @@ impl AppRuntime {
 
     pub fn ack_action_stage(&self, correlation_id: &str) -> Result<()> {
         self.with_cstr(correlation_id, |c| {
-            nmp_ffi::nmp_app_ack_action_stage(self.app, c.as_ptr())
+            nmp_app_ack_action_stage(self.app, c.as_ptr())
         })
     }
 
@@ -405,13 +404,18 @@ mod tests {
     }
 
     #[test]
-    fn note_relation_count_claim_release_are_idempotent() {
+    fn note_relation_count_claim_release_fails_closed_until_nmp_seam_returns() {
         let (runtime, _rx) = AppRuntime::new().expect("runtime starts without live relays");
 
-        assert_eq!(runtime.claim_visible_note_relation_counts(EVENT), Ok(()));
-        assert_eq!(runtime.claim_visible_note_relation_counts(EVENT), Ok(()));
-        assert_eq!(runtime.release_visible_note_relation_counts(EVENT), Ok(()));
-        assert_eq!(runtime.release_visible_note_relation_counts(EVENT), Ok(()));
+        let blocked = Err(
+            "visible note relation dispatch is blocked by pablof7z/nostr-multi-platform#2496"
+                .to_string(),
+        );
+        assert_eq!(
+            runtime.claim_visible_note_relation_counts(EVENT),
+            blocked.clone()
+        );
+        assert_eq!(runtime.release_visible_note_relation_counts(EVENT), blocked);
         assert_eq!(
             runtime.claim_visible_note_relation_counts("bad"),
             Err("event id must be 64 hex characters".to_string())

@@ -41,9 +41,10 @@
 
 use std::sync::Arc;
 
+use crate::{nmp_app_free, nmp_app_new};
 use nmp_core::substrate::KernelEvent;
 use nmp_core::ObservedProjectionSink;
-use nmp_ffi::{nmp_app_free, nmp_app_new, NmpApp};
+use nmp_native_runtime::NmpApp;
 use nmp_nip01::op_feed::{decode_op_feed_snapshot, OP_FEED_SNAPSHOT_KEY};
 use nmp_store::{EventStore, MemEventStore, RawEvent, VerifiedEvent};
 

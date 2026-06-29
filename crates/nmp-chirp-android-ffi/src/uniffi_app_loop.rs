@@ -55,12 +55,10 @@ use std::sync::Arc;
 
 use nmp_app_chirp::{
     dispatch_action_bytes_for, nmp_app_chirp_declare_consumed_projections, nmp_app_chirp_register,
-    nmp_signer_broker_init, NmpRegisterStatus,
-};
-use nmp_ffi::{
     nmp_app_declare_incremental_apply, nmp_app_dispatch_action_bytes, nmp_app_free, nmp_app_new,
-    nmp_app_start, nmp_app_stop, nmp_free_string, NmpConfigStatus,
+    nmp_app_start, nmp_app_stop, nmp_free_string, nmp_signer_broker_init, NmpRegisterStatus,
 };
+use nmp_native_runtime::NmpConfigStatus;
 
 use crate::external_signer;
 use crate::session::{insert_session, remove_session, Session};
@@ -138,7 +136,8 @@ impl AppHandle {
     /// `visible_limit`: max items in the visible window (0 = kernel default).
     /// `emit_hz`: update emission rate in Hz (0 = kernel default, max 12).
     pub fn start(&self, visible_limit: u32, emit_hz: u32) {
-        self.session.with_app(|app| nmp_app_start(app, visible_limit, emit_hz));
+        self.session
+            .with_app(|app| nmp_app_start(app, visible_limit, emit_hz));
     }
 
     /// Stop the kernel event loop.
@@ -157,9 +156,9 @@ impl AppHandle {
     /// already produce encoded action envelopes should use this over the
     /// legacy JSON adapters below.
     pub fn dispatch_action_bytes(&self, bytes: Vec<u8>) -> DispatchAck {
-        let result_ptr = self.session.with_app(|app| {
-            nmp_app_dispatch_action_bytes(app, bytes.as_ptr(), bytes.len())
-        });
+        let result_ptr = self
+            .session
+            .with_app(|app| nmp_app_dispatch_action_bytes(app, bytes.as_ptr(), bytes.len()));
         match result_ptr {
             None => DispatchAck {
                 correlation_id: None,
@@ -172,7 +171,9 @@ impl AppHandle {
             Some(ptr) => {
                 // SAFETY: nmp_app_dispatch_action_bytes returns a heap-allocated
                 // NUL-terminated C string.  nmp_free_string is the canonical free.
-                let json = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+                let json = unsafe { CStr::from_ptr(ptr) }
+                    .to_string_lossy()
+                    .into_owned();
                 nmp_free_string(ptr);
                 parse_dispatch_ack(&json)
             }
@@ -215,7 +216,7 @@ impl AppHandle {
         let update_fn: Arc<dyn Fn(Vec<u8>) + Send + Sync> = Arc::new(move |bytes: Vec<u8>| {
             let s = sink_arc.clone();
             // catch_unwind: a panicking Kotlin callback must not unwind through
-            // the C callback boundary (undefined behaviour in nmp-ffi).
+            // the C callback boundary (undefined behaviour in nmp-native-runtime).
             let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
                 s.on_update(bytes);
             }));

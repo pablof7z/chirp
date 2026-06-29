@@ -8,7 +8,7 @@
 
 use std::ffi::CString;
 
-use nmp_ffi::{nmp_app_free, nmp_app_new};
+use crate::{nmp_app_free, nmp_app_new};
 
 use super::super::{
     nmp_app_chirp_close_group_discovery, nmp_app_chirp_open_group_discovery,
@@ -72,8 +72,8 @@ fn open_group_discovery_null_and_empty_input_are_silent_noops() {
 /// `GroupId`-only body must not silently widen into a broad all-kinds read).
 #[test]
 fn register_group_events_request_wire_shape_rejects_missing_kinds() {
-    use serde::Deserialize;
     use nmp_nip29::group_id::GroupId;
+    use serde::Deserialize;
 
     #[derive(Deserialize)]
     struct Probe {
@@ -105,7 +105,7 @@ fn register_group_events_request_wire_shape_rejects_missing_kinds() {
 /// `{group, kinds}` request — it runs to completion (typed sidecar registration
 /// + muted observer + relay-pinned observed interest) without panicking, and the
 /// `"nmp.nip29.group_events"` snapshot key is synchronously registered. The
-/// hydration end-to-end is proven by the `nmp-ffi` integration tests; this
+/// hydration end-to-end is proven by the `nmp-native-runtime` integration tests; this
 /// asserts the Chirp-side delegation is sound, and that `unregister` removes
 /// the key again (#2088 teardown).
 #[test]
@@ -147,7 +147,7 @@ fn register_group_events_is_idempotent_on_re_invoke() {
     // duration of this test.
     let app_ref = unsafe { &*app };
 
-    let key_count = |a: &nmp_ffi::NmpApp| {
+    let key_count = |a: &nmp_native_runtime::NmpApp| {
         a.registered_typed_projection_keys()
             .iter()
             .filter(|k| *k == "nmp.nip29.group_events")
@@ -191,9 +191,10 @@ fn register_group_events_null_and_malformed_input_are_silent_noops() {
     let bad = CString::new(r#"{"not":"a request"}"#).unwrap();
     nmp_app_chirp_register_group_events(app, bad.as_ptr());
     // A body with the group but no `kinds` — invalid, silent return.
-    let missing_kinds =
-        CString::new(r#"{"group":{"host_relay_url":"wss://groups.example.com","local_id":"room"}}"#)
-            .unwrap();
+    let missing_kinds = CString::new(
+        r#"{"group":{"host_relay_url":"wss://groups.example.com","local_id":"room"}}"#,
+    )
+    .unwrap();
     nmp_app_chirp_register_group_events(app, missing_kinds.as_ptr());
     // Non-JSON garbage — also fails the parse gate, silent return.
     let garbage = CString::new("not json at all").unwrap();

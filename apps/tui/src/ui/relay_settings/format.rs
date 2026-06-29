@@ -116,8 +116,7 @@ pub(super) fn title_case(value: &str) -> String {
             let mut chars = word.chars();
             match chars.next() {
                 Some(first) => {
-                    first.to_uppercase().collect::<String>()
-                        + &chars.as_str().to_ascii_lowercase()
+                    first.to_uppercase().collect::<String>() + &chars.as_str().to_ascii_lowercase()
                 }
                 None => String::new(),
             }

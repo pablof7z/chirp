@@ -13,10 +13,11 @@
 use std::ffi::{c_void, CStr, CString};
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use nmp_ffi::{
+use crate::{
     nmp_app_free, nmp_app_load_older_feed, nmp_app_new, nmp_app_set_update_callback, nmp_app_start,
-    nmp_free_string, NmpApp,
+    nmp_free_string,
 };
+use nmp_native_runtime::NmpApp;
 use serde_json::Value;
 
 use super::{nmp_app_close_feed, nmp_app_open_feed};

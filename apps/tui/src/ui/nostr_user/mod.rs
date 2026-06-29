@@ -1,11 +1,11 @@
-#[path = "../../../../../nostr-multi-platform/crates/nmp-cli/registry/tui/user-name/nostr_profile_name.rs"]
-pub mod nostr_profile_name;
-#[path = "../../../../../nostr-multi-platform/crates/nmp-cli/registry/tui/user-core/profile_wire.rs"]
-pub mod profile_wire;
-#[path = "../../../../../nostr-multi-platform/crates/nmp-cli/registry/tui/user-avatar/nostr_avatar.rs"]
+#[path = "user-avatar/nostr_avatar.rs"]
 pub mod nostr_avatar;
-#[path = "../../../../../nostr-multi-platform/crates/nmp-cli/registry/tui/user-nip05/nostr_nip05_badge.rs"]
+#[path = "user-nip05/nostr_nip05_badge.rs"]
 pub mod nostr_nip05_badge;
+#[path = "user-name/nostr_profile_name.rs"]
+pub mod nostr_profile_name;
+#[path = "user-core/profile_wire.rs"]
+pub mod profile_wire;
 
 use ratatui::{
     style::Style,

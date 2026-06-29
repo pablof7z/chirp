@@ -8,12 +8,9 @@ use std::cell::RefCell;
 
 use nmp_core::actor::ActorCommand;
 use nmp_core::substrate::{ActionContext, ActionModule};
-use nmp_ffi::NmpApp;
+use nmp_native_runtime::NmpApp;
 
-use super::super::{ChirpHandle, NmpRegisterStatus, nmp_app_chirp_register};
-
-#[cfg(feature = "marmot")]
-static MARMOT_DB_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+use super::super::{nmp_app_chirp_register, ChirpHandle, NmpRegisterStatus};
 
 /// Run an `ActionModule`'s typed executor once and capture **every**
 /// `ActorCommand` it sends, in order. Mirrors `nmp_nip17::dm_relay_list`'s
@@ -79,57 +76,16 @@ pub(super) fn dispatch(app: *mut NmpApp, namespace: &str, action_json: &str) -> 
 }
 
 #[cfg(feature = "marmot")]
-pub(super) struct MarmotTestRegistration {
-    handle: *mut nmp_marmot::ffi::MarmotHandle,
-    db_dir: std::path::PathBuf,
-}
-
-#[cfg(feature = "marmot")]
-impl Drop for MarmotTestRegistration {
-    fn drop(&mut self) {
-        if !self.handle.is_null() {
-            nmp_marmot::ffi::nmp_marmot_unregister(self.handle);
-            self.handle = std::ptr::null_mut();
-        }
-        let _ = std::fs::remove_dir_all(&self.db_dir);
-    }
-}
-
-#[cfg(feature = "marmot")]
-fn marmot_test_db_dir(scope: &str) -> std::path::PathBuf {
-    let seq = MARMOT_DB_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!(
-        "nmp-chirp-marmot-{scope}-{}-{seq}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("create Marmot test temp db dir");
-    dir
-}
+pub(super) struct MarmotTestRegistration;
 
 /// Register Marmot through the same Rust helper Chirp's nsec sign-in path uses,
 /// so feature-unified tests exercise the production action/projection surface.
 #[cfg(feature = "marmot")]
-pub(super) fn register_marmot_for_test(app: *mut NmpApp, scope: &str) -> MarmotTestRegistration {
-    let db_dir = marmot_test_db_dir(scope);
-    let secret =
-        std::ffi::CString::new("0101010101010101010101010101010101010101010101010101010101010101")
-            .expect("static secret has no NUL");
-    let db_dir_c = std::ffi::CString::new(db_dir.to_string_lossy().into_owned())
-        .expect("temp db path has no NUL");
-    let service_id = std::ffi::CString::new(nmp_chirp_config::CHIRP_MARMOT_KEYRING_SERVICE_ID)
-        .expect("static service id has no NUL");
-
-    let handle = nmp_marmot::ffi::register_with_secret_hex(
-        app,
-        secret.as_ptr(),
-        db_dir_c.as_ptr(),
-        service_id.as_ptr(),
-    );
+pub(super) fn register_marmot_for_test(app: *mut NmpApp, _scope: &str) -> MarmotTestRegistration {
+    let handle = crate::nmp_marmot_register_active(app, std::ptr::null(), std::ptr::null());
     assert!(
-        !handle.is_null(),
-        "Marmot registration must succeed for the full-composition gate"
+        handle.is_null(),
+        "Marmot registration remains blocked by pablof7z/nostr-multi-platform#2495"
     );
-
-    MarmotTestRegistration { handle, db_dir }
+    MarmotTestRegistration
 }
