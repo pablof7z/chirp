@@ -4,22 +4,45 @@
 //! (AGENTS.md). Exported from `ffi/mod.rs` alongside the rest of the
 //! `pub extern "C"` surface.
 //!
-//! ## Thin shell over the `nmp-ffi` composition root (#2088)
+//! ## Thin shell over the `nmp-native-runtime` composition root (#2088)
 //!
 //! These symbols hold ZERO logic: they parse C strings and delegate to the
 //! hydrating `NmpApp::open_group_*` / `close_group_*` methods that live in
-//! `nmp-ffi` (`group_feed.rs`). The composition — register the projection
+//! `nmp-native-runtime` (`group_feed.rs`). The composition — register the projection
 //! muted, route ingest through `open_observed_interest_pinned` for read-cache
 //! replay, record a teardown handle — lives there, not here, because it must
 //! name `NmpApp` (the FFI host type `nmp-nip29` may not name, D0).
 
+use std::collections::HashMap;
 use std::ffi::c_char;
+use std::sync::{Mutex, OnceLock};
 
-use nmp_ffi::{open_group_discovery_handle, GroupFeedHandle, NmpApp};
+use nmp_native_runtime::{
+    Nip29GroupDiscoveryHandle, Nip29GroupDiscoverySession, Nip29GroupEventsHandle,
+    Nip29GroupEventsSession, NmpApp,
+};
 use nmp_nip29::group_id::GroupId;
 use serde::Deserialize;
 
 use super::helpers::c_string_opt;
+
+static GROUP_EVENTS_HANDLES: OnceLock<Mutex<HashMap<usize, Nip29GroupEventsHandle>>> =
+    OnceLock::new();
+
+fn group_events_handles() -> &'static Mutex<HashMap<usize, Nip29GroupEventsHandle>> {
+    GROUP_EVENTS_HANDLES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Chirp-owned opaque C handle for a NIP-29 group-discovery session.
+///
+/// NMP's current typed read-session handle intentionally carries no app
+/// pointer. Chirp's existing C ABI closes discovery with the handle only, so
+/// this wrapper records the owning app pointer as FFI delivery bookkeeping and
+/// delegates teardown back to `NmpApp`.
+pub struct GroupFeedHandle {
+    app: *mut NmpApp,
+    handle: Nip29GroupDiscoveryHandle,
+}
 
 /// The C-ABI request shape for [`nmp_app_chirp_register_group_events`].
 ///
@@ -91,8 +114,18 @@ pub extern "C" fn nmp_app_chirp_register_group_events(
         return;
     };
 
-    // Thin-shell rule: parse C string, delegate to the hydrating composer.
-    app_ref.open_group_events(request.group, request.kinds);
+    let Ok(mut handles) = group_events_handles().lock() else {
+        return;
+    };
+    let app_key = app as usize;
+    if let Some(handle) = handles.remove(&app_key) {
+        app_ref.close_nip29_group_events_session(handle);
+    }
+    let handle = app_ref.open_nip29_group_events_session(Nip29GroupEventsSession::new(
+        request.group,
+        request.kinds,
+    ));
+    handles.insert(app_key, handle);
 }
 
 /// Tear down the NIP-29 group-events read view opened by
@@ -110,7 +143,12 @@ pub extern "C" fn nmp_app_chirp_unregister_group_events(app: *mut NmpApp) {
     }
     // SAFETY: caller guarantees `app` is a valid pointer from `nmp_app_new`.
     let app_ref = unsafe { &*app };
-    app_ref.close_group_events();
+    let Ok(mut handles) = group_events_handles().lock() else {
+        return;
+    };
+    if let Some(handle) = handles.remove(&(app as usize)) {
+        app_ref.close_nip29_group_events_session(handle);
+    }
 }
 
 /// Open a NIP-29 group-discovery session for one host relay.
@@ -146,8 +184,9 @@ pub extern "C" fn nmp_app_chirp_open_group_discovery(
         return std::ptr::null_mut();
     };
 
-    // Thin-shell rule: parse C string, delegate to the hydrating composer.
-    Box::into_raw(Box::new(open_group_discovery_handle(app_ref, relay_url)))
+    let handle =
+        app_ref.open_nip29_group_discovery_session(Nip29GroupDiscoverySession::new(relay_url));
+    Box::into_raw(Box::new(GroupFeedHandle { app, handle }))
 }
 
 /// Close a NIP-29 group-discovery session opened by
@@ -167,9 +206,15 @@ pub extern "C" fn nmp_app_chirp_close_group_discovery(handle: *mut GroupFeedHand
     }
     // SAFETY: `handle` is a valid pointer returned by
     // `nmp_app_chirp_open_group_discovery` and must not be used after this
-    // call. `Box::from_raw` takes ownership; `GroupFeedHandle::close` tears
-    // down the interest + observer + projection (the app it references must
-    // still be alive — the caller's documented contract).
-    let handle = unsafe { *Box::from_raw(handle) };
-    unsafe { handle.close() };
+    // call. `Box::from_raw` takes ownership; the app it references must still
+    // be alive per the documented contract.
+    let handle = unsafe { Box::from_raw(handle) };
+    if handle.app.is_null() {
+        return;
+    }
+    // SAFETY: `handle.app` is the app pointer supplied to
+    // `nmp_app_chirp_open_group_discovery`; callers must close the handle
+    // before freeing that app.
+    let app_ref = unsafe { &*handle.app };
+    app_ref.close_nip29_group_discovery_session(handle.handle);
 }

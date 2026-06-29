@@ -36,10 +36,12 @@
 //! and are exempt rather than asserted-on; deleting them from the registry is
 //! tracked separately).
 //!
-//! `nmp.marmot.*` is exempt unless this crate's `marmot` feature is enabled:
-//! the Marmot registration (and its 5,400-LOC MLS dependency tree) is
-//! feature-gated out of the default test build, so the producer cannot be
-//! observed here; the Marmot crate's own tests own that proof.
+//! `nmp.marmot.*` is exempt while pablof7z/nostr-multi-platform#2495 is open:
+//! after the NMP migration deleted the old reusable C shell, Chirp has no
+//! current architecture seam for registering active Marmot app projections
+//! without rebuilding app logic locally. Chirp is an NMP validator, so the
+//! correct behavior is a named fail-closed blocker, not a local surrogate
+//! producer.
 //!
 //! ## Synchronisation (no polling)
 //!
@@ -52,14 +54,15 @@
 //! `recv_timeout` is a blocking wait on a real channel, not a sleep loop.
 
 use std::collections::BTreeSet;
-use std::ffi::{CString, c_void};
-use std::sync::mpsc::{Sender, channel};
+use std::ffi::{c_void, CString};
+use std::sync::mpsc::{channel, Sender};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
+use crate::{nmp_app_free, nmp_app_new, nmp_app_set_update_callback, nmp_app_start};
 use nmp_codegen::swift_projections_registry::SNAPSHOT_PROJECTIONS;
 use nmp_core::decode_snapshot_envelope;
-use nmp_ffi::{NmpApp, nmp_app_free, nmp_app_new, nmp_app_set_update_callback, nmp_app_start};
+use nmp_native_runtime::NmpApp;
 
 use super::super::super::{
     nmp_app_chirp_close_group_discovery, nmp_app_chirp_open_group_discovery,
@@ -171,13 +174,12 @@ fn every_codegen_registry_key_is_registered_at_runtime() {
             .map(|k| (*k).to_string()),
     );
 
-    // Feature-gated exemptions — keys whose producer is compiled out of this
-    // test build. Each entry must name the gating feature.
+    // Keys intentionally absent from Chirp's runtime producer surface. Each
+    // entry must name the upstream blocker or gating feature; everything else
+    // remains covered by the generic registry/runtime assertion below.
     let mut exempt: BTreeSet<&str> = BTreeSet::new();
-    if cfg!(not(feature = "marmot")) {
-        exempt.insert("nmp.marmot.snapshot"); // feature = "marmot"
-        exempt.insert("nmp.marmot.messages"); // feature = "marmot"
-    }
+    exempt.insert("nmp.marmot.snapshot"); // pablof7z/nostr-multi-platform#2495
+    exempt.insert("nmp.marmot.messages"); // pablof7z/nostr-multi-platform#2495
     if cfg!(not(feature = "wallet")) {
         exempt.insert("wallet"); // feature = "wallet" (default-on)
     }

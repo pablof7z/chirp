@@ -7,7 +7,7 @@
 //! pair to [`dispatch_action_bytes_for`], which encodes the namespace's typed
 //! [`ActionPayload`](nmp_core::substrate::ActionPayload) bytes, wraps them in an
 //! open `DispatchEnvelope`, and calls the typed
-//! [`nmp_ffi::nmp_app_dispatch_action_bytes`] doorway. No JSON crosses to the
+//! [`nmp_native_runtime::nmp_app_dispatch_action_bytes`] doorway. No JSON crosses to the
 //! kernel.
 //!
 //! This is the raw doorway for the direct-dispatch sites (NIP-29 group ops,
@@ -22,7 +22,7 @@ use std::ffi::{c_char, CStr, CString};
 
 use serde_json::json;
 
-use nmp_ffi::NmpApp;
+use nmp_native_runtime::NmpApp;
 
 use crate::dispatch_bytes::dispatch_action_bytes_for;
 

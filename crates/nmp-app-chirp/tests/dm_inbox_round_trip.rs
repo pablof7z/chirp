@@ -24,16 +24,14 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::{Arc, Mutex};
 
 use nmp_app_chirp::ffi::nmp_app_chirp_register_dm_inbox;
-use nmp_core::{ActorMail, CommandSender};
-use nmp_core::actor::{ActorCommand};
-use nmp_core::actor::{SignCommand};
-use nmp_store::{RawEvent, VerifiedEvent};
+use nmp_app_chirp::{nmp_app_free, nmp_app_new, nmp_app_signin_nsec, nmp_app_start};
+use nmp_core::actor::ActorCommand;
+use nmp_core::actor::SignCommand;
 use nmp_core::substrate::IngestParser;
-use nmp_ffi::{
-    nmp_app_free, nmp_app_inject_signed_event_json, nmp_app_new, nmp_app_signin_nsec, nmp_app_start,
-    NmpApp,
-};
+use nmp_core::{ActorMail, CommandSender};
+use nmp_native_runtime::NmpApp;
 use nmp_nip17::{DmInboxProjection, DmInboxSnapshot};
+use nmp_store::{RawEvent, VerifiedEvent};
 use nostr::nips::nip19::ToBech32;
 use nostr::{EventBuilder, Keys, Kind, PublicKey, Tag, Timestamp};
 
@@ -123,7 +121,6 @@ fn dm_inbox_decrypts_through_the_signer_port() {
     let (proj, rx) = aux_projection(&bob.public_key());
 
     let envelope = gift_wrapped_dm(&alice, &bob.public_key(), "hello bob", 12345);
-    let envelope_json = nostr::JsonUtil::as_json(&envelope);
     proj.parse(&verified(&envelope));
     drive_local_decrypts(&rx, &bob);
 
@@ -255,8 +252,8 @@ fn dm_inbox_full_round_trip_through_ffi() {
     // Inject the verbatim signed event. The actor ingests it, the DmInboxProjection
     // IngestParser fires, and the two `Nip44DecryptForAccount` commands resolve
     // INLINE on the actor thread (Bob is local) — landing the message.
-    let json_cstr = CString::new(envelope_json.as_str()).expect("envelope JSON must be NUL-free");
-    let ok = nmp_app_inject_signed_event_json(app, json_cstr.as_ptr());
+    let app_ref: &NmpApp = unsafe { &*app };
+    let ok = app_ref.inject_signed_event_json_for_test(envelope_json.as_str());
     assert!(
         ok,
         "nmp_app_inject_signed_event_json must return true for a valid gift-wrap envelope",
@@ -266,7 +263,6 @@ fn dm_inbox_full_round_trip_through_ffi() {
     std::thread::sleep(Duration::from_millis(500));
 
     // Decode via the typed FlatBuffers sidecar (generic JSON lane deleted — rule A6).
-    let app_ref: &NmpApp = unsafe { &*app };
     let typed = app_ref.run_typed_snapshot_projections();
     let entry = typed
         .iter()

@@ -100,7 +100,7 @@ pub extern "system" fn Java_org_nmp_android_KernelBridge_nativeIdentityRestore(
     // D13: the plaintext nsec crosses the JNI seam as bytes (it MUST, to be
     // restored), but the Rust-side copy is wrapped in `Zeroizing` the instant it
     // is materialized so the buffer is wiped on drop — including the early-return
-    // and panic-unwind paths. Mirrors `nmp-ffi::identity::nmp_app_signin_nsec`,
+    // and panic-unwind paths. Mirrors `nmp-native-runtime::identity::nmp_app_signin_nsec`,
     // which wraps its `c_string_argument(secret)` in `zeroize::Zeroizing`.
     // `zeroize` implements `Zeroize for CString`, so `Zeroizing<CString>` zeroes
     // the secret bytes (not just the smart-pointer) at scope exit.
@@ -132,8 +132,10 @@ pub extern "system" fn Java_org_nmp_android_KernelBridge_nativeIdentityRestore(
         Some(ptr) if !ptr.is_null() => {
             // Idempotency on restart: unregister any stale handle first.
             crate::marmot::unregister(&s);
-            s.marmot
-                .store(ptr as *mut MarmotHandle as *mut std::ffi::c_void, Ordering::SeqCst);
+            s.marmot.store(
+                ptr as *mut MarmotHandle as *mut std::ffi::c_void,
+                Ordering::SeqCst,
+            );
             1
         }
         _ => 0,

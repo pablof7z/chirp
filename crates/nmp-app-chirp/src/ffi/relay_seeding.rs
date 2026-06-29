@@ -24,7 +24,9 @@
 
 use std::ffi::{c_char, CStr};
 
-use nmp_ffi::{nmp_app_add_relay, NmpApp};
+use nmp_native_runtime::NmpApp;
+
+use crate::nmp_app_add_relay;
 
 /// Seed the Chirp reference relay set onto `app`.
 ///

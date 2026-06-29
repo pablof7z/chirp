@@ -81,7 +81,10 @@ fn root_card_with_attribution_keeps_raw_repliers_and_no_reply_row() {
     assert_eq!(rows[0].thread_attribution.len(), 1);
     let attribution = &rows[0].thread_attribution[0];
     assert_eq!(attribution.author_pubkey, replier_pubkey);
-    assert_eq!(attribution.author_profile.display_name.as_deref(), Some("Alice"));
+    assert_eq!(
+        attribution.author_profile.display_name.as_deref(),
+        Some("Alice")
+    );
     assert_eq!(attribution.reply_event_id, reply_id);
     assert_eq!(attribution.reply_created_at, 150);
 }
@@ -154,14 +157,23 @@ fn repost_root_keyed_by_target_id() {
     // The row resolves to the target id (not a wrapper id).
     assert_eq!(rows[0].id, target_id);
     assert_eq!(rows[0].author_label(), "calle");
-    assert_eq!(rows[0].created_at, 50, "displayed time is the original note's");
+    assert_eq!(
+        rows[0].created_at, 50,
+        "displayed time is the original note's"
+    );
     let repost = rows[0].repost.as_ref().expect("repost attribution present");
     assert_eq!(
         repost.author_pubkey,
         "reposterreposterreposterreposterreposterreposterreposterreposte"
     );
-    assert_eq!(repost.author_profile.display_name.as_deref(), Some("pablof7z"));
-    assert_eq!(repost.repost_created_at, 100, "repost line shows the kind:6 timestamp");
+    assert_eq!(
+        repost.author_profile.display_name.as_deref(),
+        Some("pablof7z")
+    );
+    assert_eq!(
+        repost.repost_created_at, 100,
+        "repost line shows the kind:6 timestamp"
+    );
 }
 
 #[test]

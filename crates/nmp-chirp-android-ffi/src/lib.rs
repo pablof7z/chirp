@@ -50,10 +50,10 @@ mod signer;
 mod signer_request_listener;
 mod uniffi_app_loop;
 mod update_listener;
-use nmp_app_chirp::nmp_app_chirp_create_new_account;
-use nmp_ffi::{
-    nmp_app_add_relay, nmp_app_encode_profile, nmp_app_remove_account, nmp_app_remove_relay,
-    nmp_app_signin_nsec, nmp_app_switch_active, nmp_free_string,
+use nmp_app_chirp::{
+    nmp_app_add_relay, nmp_app_chirp_create_new_account, nmp_app_encode_profile,
+    nmp_app_remove_account, nmp_app_remove_relay, nmp_app_signin_nsec, nmp_app_switch_active,
+    nmp_free_string,
 };
 pub(crate) use session::{session_arc, Session};
 
@@ -171,7 +171,7 @@ pub extern "system" fn Java_org_nmp_android_KernelBridge_nativeEncodeProfile(
         .to_string_lossy()
         .into_owned();
     // SAFETY: `nmp_free_string` is the canonical free for C-strings
-    // allocated by any NMP FFI function (nmp-ffi/src/free.rs).
+    // allocated by any NMP FFI function (nmp-native-runtime/src/free.rs).
     nmp_free_string(raw_ptr);
     env.new_string(encoded)
         .map(|s| s.into_raw())

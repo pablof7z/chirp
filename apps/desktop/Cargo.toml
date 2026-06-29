@@ -17,8 +17,7 @@ nmp-app-chirp = { path = "../../crates/nmp-app-chirp", default-features = false,
 # Shared Chirp app configuration — relay bootstrap defaults.
 nmp-chirp-config = { path = "../../crates/nmp-chirp-config" }
 
-# C-ABI surface (NmpApp, nmp_app_* symbols).
-nmp-ffi = { workspace = true }
+nmp-native-runtime = { workspace = true }
 nmp-feed = { workspace = true }
 
 # In-process kernel: we still decode FlatBuffer frames and use display helpers.
@@ -49,4 +48,4 @@ keyring = { version = "3.6.3", default-features = false, features = ["apple-nati
 
 [dev-dependencies]
 nmp-core = { workspace = true, features = ["test-support"] }
-nmp-ffi = { workspace = true, features = ["test-support"] }
+nmp-native-runtime = { workspace = true, features = ["test-support"] }

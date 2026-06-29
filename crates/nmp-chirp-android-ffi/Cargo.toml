@@ -30,10 +30,9 @@ required-features = ["bindgen-cli"]
 # `android/app/build.gradle.kts` passes `--features marmot`, it is NOT
 # hardcoded on the dependency — so `cargo build` (no features) still yields a
 # Marmot-free .so for CI / non-Marmot consumers. Forwards to
-# `nmp-app-chirp/marmot`, which activates `nmp-marmot` + its `ffi` feature
-# and makes the `nmp_marmot_*` C-ABI symbols reachable through Rust paths from
-# the JNI shim (the same symbol-retention mechanism documented at the top of
-# `src/lib.rs`).
+# `nmp-app-chirp/marmot`, which exports fail-closed `nmp_marmot_*` C-ABI
+# symbols until pablof7z/nostr-multi-platform#2495 restores the NMP-owned
+# active-registration seam.
 marmot = ["nmp-app-chirp/marmot", "dep:libsqlite3-sys", "dep:openssl-src"]
 # Gate the uniffi-bindgen CLI binary to keep clap/camino out of the .so.
 bindgen-cli = ["uniffi/cli"]
@@ -41,15 +40,14 @@ bindgen-cli = ["uniffi/cli"]
 [dependencies]
 # Path-dep on the SAME kernel the iOS app consumes.
 nmp-core = { workspace = true }
-# C-ABI surface owner (extracted from `nmp-core::ffi` in step 11-final of
-# `docs/architecture/crate-boundaries.md` §5). The JNI shim consumes the
-# `nmp_app_*` Rust paths through this crate.
-nmp-ffi = { workspace = true, features = ["android-ffi"] }
+# Native runtime owner after the reusable C ABI deletion. The Android delivery
+# crate remains app-owned glue and calls runtime methods directly.
+nmp-native-runtime = { workspace = true, features = ["android-ffi"] }
 nmp-feed = { workspace = true }
 # Chirp app composition: registers the modular timeline observer, provides
 # Chirp-specific account creation with product seed follows, and re-exports
 # Marmot/wallet symbols when features are enabled.
-nmp-app-chirp = { path = "../nmp-app-chirp", default-features = false }
+nmp-app-chirp = { path = "../nmp-app-chirp", default-features = false, features = ["android-ffi"] }
 # Chirp reference-client relay bootstrap shared with the TUI/REPL surfaces.
 nmp-chirp-config = { path = "../nmp-chirp-config" }
 jni = "0.21"

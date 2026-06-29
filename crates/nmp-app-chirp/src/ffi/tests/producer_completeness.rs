@@ -31,7 +31,8 @@
 use std::collections::BTreeSet;
 use std::ffi::CString;
 
-use nmp_ffi::{nmp_app_free, nmp_app_new, NmpApp};
+use crate::{nmp_app_free, nmp_app_new};
+use nmp_native_runtime::NmpApp;
 
 use super::super::{
     nmp_app_chirp_close_group_discovery, nmp_app_chirp_open_group_discovery,

@@ -10,7 +10,7 @@
 
 use std::sync::Arc;
 
-use nmp_ffi::NmpApp;
+use nmp_native_runtime::NmpApp;
 
 /// Register the NIP-47 wallet stack on `app`. Called by
 /// `nmp_app_chirp_register` when the `wallet` feature is on.

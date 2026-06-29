@@ -11,9 +11,10 @@ use jni::objects::{JClass, JObject, JString};
 use jni::sys::{jlong, jstring};
 use jni::JNIEnv;
 
-use nmp_app_chirp::{nmp_app_cancel_bunker_handshake, nmp_app_nostrconnect_uri};
-use nmp_ffi::nmp_free_string;
-use nmp_ffi::nmp_app_signin_bunker;
+use nmp_app_chirp::{
+    nmp_app_cancel_bunker_handshake, nmp_app_nostrconnect_uri, nmp_app_signin_bunker,
+    nmp_free_string,
+};
 
 use crate::{jstring_to_cstring, session_arc};
 

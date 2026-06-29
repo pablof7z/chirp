@@ -2,14 +2,17 @@
 
 use std::ffi::{CStr, CString};
 
-use nmp_ffi::{nmp_app_free, nmp_app_new, nmp_free_string};
+use crate::{nmp_app_free, nmp_app_new, nmp_free_string};
 
 use super::super::nmp_app_chirp_dispatch_action_bytes;
 use super::helpers::register_app;
 
 /// Read + free a `*mut c_char` dispatch envelope into a parsed JSON value.
 fn read_dispatch_envelope(ptr: *mut std::ffi::c_char) -> serde_json::Value {
-    assert!(!ptr.is_null(), "dispatch envelope must return a JSON string");
+    assert!(
+        !ptr.is_null(),
+        "dispatch envelope must return a JSON string"
+    );
     let out = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_string();
     nmp_free_string(ptr);
     serde_json::from_str(&out).unwrap()

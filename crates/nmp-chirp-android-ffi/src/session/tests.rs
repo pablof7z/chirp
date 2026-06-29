@@ -1,11 +1,11 @@
 //! Unit tests for `Session` — factored out of `session.rs` to keep that file
 //! under the 500-LOC ceiling (AGENTS.md §File-Size).
 
-use std::sync::Arc;
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::time::Duration;
 
-use super::{NextUpdate, Session, insert_session, remove_session, session_arc};
+use super::{insert_session, remove_session, session_arc, NextUpdate, Session};
 
 #[test]
 fn on_update_forwards_frame_to_mpsc_when_no_generic_sink() {
@@ -90,8 +90,7 @@ fn close_updates_does_not_deadlock_when_callback_reenters_with_app() {
     let session = Arc::new(Session::test_session());
 
     let (started_tx, started_rx) = mpsc::sync_channel::<()>(0);
-    let gate: Arc<(Mutex<bool>, Condvar)> =
-        Arc::new((Mutex::new(false), Condvar::new()));
+    let gate: Arc<(Mutex<bool>, Condvar)> = Arc::new((Mutex::new(false), Condvar::new()));
     let gate_ref = Arc::clone(&gate);
     let session_ref = Arc::clone(&session);
 
@@ -171,7 +170,7 @@ fn callback_mutation_guard_write_lock_blocks_until_readers_finish() {
     let reader = std::thread::spawn(move || {
         let _read_guard = session_a.callback_mutation_guard.read().unwrap();
         read_acquired_tx.send(()).ok(); // signal: read lock held
-        // Hold until signalled — verifies the write lock cannot proceed meanwhile.
+                                        // Hold until signalled — verifies the write lock cannot proceed meanwhile.
         release_read_rx.recv().ok();
         // completed must still be false: writer is blocked by this guard.
         assert!(

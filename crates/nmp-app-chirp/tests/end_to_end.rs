@@ -23,13 +23,13 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use nmp_app_chirp::{
-    nmp_app_chirp_register, nmp_app_chirp_unregister, ChirpHandle, NmpRegisterStatus,
-    OpFeedSnapshot,
+    nmp_app_chirp_register, nmp_app_chirp_unregister, nmp_app_free, nmp_app_load_older_feed,
+    nmp_app_new, nmp_app_start, ChirpHandle, NmpRegisterStatus, OpFeedSnapshot,
 };
 
 /// Convenience wrapper: register with no viewer pubkey (the common case in
 /// these tests) and panic on failure.
-fn register_app(app: *mut nmp_ffi::NmpApp) -> *mut ChirpHandle {
+fn register_app(app: *mut nmp_native_runtime::NmpApp) -> *mut ChirpHandle {
     let mut handle: *mut ChirpHandle = std::ptr::null_mut();
     let status = nmp_app_chirp_register(app, std::ptr::null(), &mut handle);
     assert_eq!(
@@ -44,13 +44,12 @@ fn register_app(app: *mut nmp_ffi::NmpApp) -> *mut ChirpHandle {
 /// Sign in `pubkey` by writing the same active-account slot the actor writes
 /// on real sign-in. `register_op_feed_defaults` reads this slot during Chirp
 /// registration to open the home feed's declared active-follows shape.
-fn set_active_account(app: *mut nmp_ffi::NmpApp, pubkey: &str) {
+fn set_active_account(app: *mut nmp_native_runtime::NmpApp, pubkey: &str) {
     let app_ref = unsafe { &*app };
     *app_ref.active_account_handle().lock().expect("active slot") = Some(pubkey.to_string());
 }
 use nmp_core::actor::ActorCommand;
 use nmp_core::actor::TestSupportCommand;
-use nmp_ffi::{nmp_app_free, nmp_app_load_older_feed, nmp_app_new, nmp_app_start};
 use nmp_nip01::DEFAULT_TIMELINE_WINDOW_LIMIT;
 use nmp_store::{RawEvent, VerifiedEvent};
 
@@ -77,7 +76,7 @@ fn feed_projection_for(handle: *mut ChirpHandle) -> OpFeedSnapshot {
     unsafe { &*handle }.snapshot()
 }
 
-fn inject(app: *mut nmp_ffi::NmpApp, events: Vec<VerifiedEvent>) {
+fn inject(app: *mut nmp_native_runtime::NmpApp, events: Vec<VerifiedEvent>) {
     // SAFETY: `app` is a valid `*mut NmpApp` for the duration of this call
     // — caller passes the same handle they got from `nmp_app_new`.
     let app_ref = unsafe { &*app };

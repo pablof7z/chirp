@@ -9,7 +9,7 @@
 //! ## Wiring
 //!
 //! The iOS shell links this one aggregate static library for Chirp. Keeping
-//! `nmp-ffi`, the NIP-46 broker adapter, and the Chirp projection in one Rust
+//! `nmp-native-runtime`, the NIP-46 broker adapter, and the Chirp projection in one Rust
 //! archive gives the process exactly one copy of the native C-ABI state.
 //!
 //! The shell calls [`nmp_signer_broker_init`] once after `nmp_app_new` and
@@ -44,6 +44,7 @@ pub mod action_specs;
 // call. The retired JSON `nmp_app_dispatch_action` doorway has no caller here.
 pub mod dispatch_bytes;
 pub mod ffi;
+pub mod native_ffi;
 pub mod snapshot_types;
 pub mod typed_api;
 #[cfg(feature = "wallet")]
@@ -82,9 +83,33 @@ pub use ffi::{
     // #1740 step 7 — the ONE public app-facing feed doorway.
     nmp_app_close_feed,
     nmp_app_open_feed,
+    GroupFeedHandle,
 };
-pub use nmp_ffi::{
-    nmp_app_cancel_bunker_handshake, nmp_app_nostrconnect_uri, nmp_signer_broker_init,
+pub use native_ffi::{
+    nmp_app_ack_action_stage, nmp_app_add_relay, nmp_app_cancel_action,
+    nmp_app_cancel_bunker_handshake, nmp_app_close_interest, nmp_app_configure,
+    nmp_app_consume_all_builtin_projections, nmp_app_create_new_account, nmp_app_debug_info,
+    nmp_app_declare_consumed_projections, nmp_app_declare_incremental_apply,
+    nmp_app_dispatch_action_bytes, nmp_app_dispatch_capability, nmp_app_encode_profile,
+    nmp_app_free, nmp_app_intent_classify, nmp_app_intent_dispatch, nmp_app_is_alive,
+    nmp_app_lifecycle_background, nmp_app_lifecycle_foreground, nmp_app_load_older_feed,
+    nmp_app_new, nmp_app_nostrconnect_uri, nmp_app_open_interest, nmp_app_open_uri,
+    nmp_app_register_action_result_observer, nmp_app_register_agent_nsec,
+    nmp_app_release_event_ref, nmp_app_release_profile_ref, nmp_app_release_ref,
+    nmp_app_remove_account, nmp_app_remove_relay, nmp_app_reset, nmp_app_resolve_event_embed,
+    nmp_app_resolve_event_embed_live, nmp_app_resolve_event_embed_live_with_metadata,
+    nmp_app_resolve_event_embed_with_metadata, nmp_app_resolve_profile_card_live,
+    nmp_app_resolve_profile_ref, nmp_app_resolve_ref, nmp_app_resolve_ref_with_metadata,
+    nmp_app_retry_publish, nmp_app_search_close, nmp_app_search_open, nmp_app_search_snapshot,
+    nmp_app_set_capability_callback, nmp_app_set_lifecycle_callback, nmp_app_set_storage_path,
+    nmp_app_set_update_callback, nmp_app_sign_event_for_return, nmp_app_signin_bunker,
+    nmp_app_signin_nsec, nmp_app_start, nmp_app_stop, nmp_app_switch_active,
+    nmp_content_tokenize_text, nmp_free_string, nmp_mirror_free_bytes, nmp_mirror_pull_page,
+    nmp_nip21_decode_uri, nmp_signer_broker_init, NmpMirrorBytes,
+};
+#[cfg(feature = "android-ffi")]
+pub use native_ffi::{
+    nmp_app_deliver_external_signer_response, nmp_app_signin_nip55, nmp_external_signer_init,
 };
 pub use nmp_nip01::{
     Nip10ReplyAttribution as ChirpReplyAttribution, TimelineEventCard as ChirpEventCard,
@@ -112,44 +137,18 @@ pub type OpFeedSnapshot = nmp_feed::RootFeedSnapshot<ChirpEventCard, ChirpReplyA
 
 // ── Marmot (MLS encrypted groups) projection ─────────────────────────────
 //
-// A second FFI projection over the same kernel substrate. Mirrors the
-// timeline symbols' naming / lifetime / free conventions. The iOS agent
-// links these alongside the timeline symbols.
-//
-// The reusable C-ABI shell lives in the `nmp-marmot` crate
-// (`crates/nmp-marmot/src/ffi.rs` + siblings) so the crate is a standalone
-// buildable target for a future Marmot-only app. Chirp pulls it in via the
-// `nmp-marmot/ffi` feature; the `#[no_mangle] nmp_marmot_*` symbols flow
-// through `libnmp_app_chirp.a` automatically via rlib linkage (iOS still
-// links exactly one staticlib). Chirp-specific identity/keyring wrappers stay
-// in this app crate so `nmp-marmot` does not own Chirp symbol names or
-// keyring account policy.
-//
-// Gated behind the `marmot` feature: MLS-over-Nostr was formally deferred to
-// post-v1. Chirp opts in via its default feature set; a no-default-features
-// build excludes the whole projection (dependency, modules, and FFI symbols).
+// The current NMP migration deleted the prior reusable C shell before exposing
+// the replacement active-registration seam required by ADR-0025. Chirp keeps
+// these exported names fail-closed so the migration validates the architecture
+// gap instead of copying Marmot internals here. Upstream blocker:
+// pablof7z/nostr-multi-platform#2495.
 #[cfg(feature = "marmot")]
-pub use ffi::{
+pub use native_ffi::{
     nmp_app_chirp_identity_remove_account, nmp_app_chirp_identity_restore,
     nmp_app_chirp_identity_sign_in_nsec,
 };
-// #1727: the vestigial `nmp_marmot_fetch_key_packages` C-ABI symbol was
-// deleted — it had no native caller and the same key-package lookup interest
-// is already pushed internally by the invite/group flow.
-// V-107 / ADR-0039: `nmp_marmot_snapshot`, `nmp_marmot_group_messages`, and
-// `nmp_marmot_string_free` were deleted. Swift now reads Marmot state from
-// the push projections (`nmp.marmot.snapshot` / `nmp.marmot.messages`) on
-// the SnapshotFrame instead. Only the lifecycle symbols remain exported here.
-// #1727: `nmp_marmot_register` (secret-bearing) is no longer a C-ABI symbol —
-// it became a plain Rust fn (`nmp_marmot::ffi::register_with_secret_hex`) used
-// only Rust-side by the nsec sign-in wrapper. No native-facing `nmp_marmot_*`
-// symbol carries secret key material; native registers via `register_active`,
-// which reads the actor-owned `mls_local_nsec` slot.
 #[cfg(feature = "marmot")]
-pub use nmp_marmot::ffi::{nmp_marmot_register_active, nmp_marmot_unregister, MarmotHandle};
-#[cfg(feature = "marmot")]
-pub use nmp_marmot::projection::payload::{
-    KeyPackageStatus, MarmotGroupRow, MarmotMessageRow, MarmotSnapshot, PendingWelcomeRow,
+pub use native_ffi::{
+    nmp_marmot_register_active, nmp_marmot_unregister, KeyPackageStatus, MarmotGroupRow,
+    MarmotHandle, MarmotMessageRow, MarmotProjection, MarmotSnapshot, PendingWelcomeRow,
 };
-#[cfg(feature = "marmot")]
-pub use nmp_marmot::projection::state::MarmotProjection;

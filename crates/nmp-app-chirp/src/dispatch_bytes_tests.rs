@@ -75,10 +75,6 @@ fn every_dispatched_namespace_encodes_to_typed_payload() {
             r#"{"url":"wss://relay.example","account_pubkey":"deadbeef"}"#,
         ),
         (
-            "nmp.nip01.visible_note_relations",
-            r#"{"op":"claim","event_id":"abc","consumer_id":"row-0"}"#,
-        ),
-        (
             "nmp.nip29.discover",
             r#"{"relay_url":"wss://groups.example"}"#,
         ),
@@ -135,6 +131,19 @@ fn wallet_namespaces_encode_to_typed_payload() {
 fn unknown_namespace_is_rejected_fail_closed() {
     let err = super::encode_payload_for_namespace("nmp.nope", "{}").unwrap_err();
     assert!(err.contains("no typed payload encoder"));
+}
+
+#[test]
+fn visible_note_relations_are_rejected_until_nmp_restores_the_action_seam() {
+    let err = super::encode_payload_for_namespace(
+        "nmp.nip01.visible_note_relations",
+        r#"{"op":"claim","event_id":"abc","consumer_id":"row-0"}"#,
+    )
+    .unwrap_err();
+    assert!(
+        err.contains("pablof7z/nostr-multi-platform#2496"),
+        "visible relation claims must fail closed on the upstream blocker, got: {err}"
+    );
 }
 
 #[test]

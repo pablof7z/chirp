@@ -10,11 +10,11 @@
 //! The fix pins `openssl-src` to the last pre-3.5 line (OpenSSL 3.4.1, which has
 //! no PQ provider units) so the vendored build cross-compiles cleanly for ALL
 //! shipped ABIs — arm64-v8a AND x86_64. These tests are hermetic string/range
-//! checks over the manifest + lockfile (no NDK, no emulator), matching the
-//! `bridge_parity.rs` posture.
+//! checks over the manifest + workspace lockfile (no NDK, no emulator),
+//! matching the `bridge_parity.rs` posture.
 
 const CARGO_TOML: &str = include_str!("../Cargo.toml");
-const CARGO_LOCK: &str = include_str!("../Cargo.lock");
+const CARGO_LOCK: &str = include_str!("../../../Cargo.lock");
 
 /// The manifest must pin `openssl-src` to an exact pre-3.5 line. A bare floor
 /// (or no pin) lets the resolver pick `300.6.x+3.6.3`, which reintroduces the

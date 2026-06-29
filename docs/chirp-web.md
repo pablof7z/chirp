@@ -6,13 +6,15 @@ TypeScript protocol policy.
 
 ## Production Deployment Contract
 
-Chirp Web production deploys must use a normal Vercel remote build from the
-monorepo root. The source bundle must include the Rust workspace crates, Chirp's
-app Rust workspace members, `web/packages`, and `web/chirp` so the deploy builds
-`nmp-browser-runtime` WASM from source before bundling the thin TypeScript
-shell. The canonical command path is the root `vercel.json`: install the web
-workspace, run `@nmp/chirp-web`'s `build:vercel`, and publish
-`web/chirp/dist`.
+Chirp Web production deploys must use a normal remote build from the split
+Chirp repository. The source bundle must include Chirp's app Rust workspace
+members and consume NMP-owned web packages (`@nmp/runtime-web` and
+`@nmp/components-web`) through a supported NMP dependency seam. Chirp must not
+copy those shared package sources into this repo; NMP issue
+[#2497](https://github.com/pablof7z/nostr-multi-platform/issues/2497) owns the
+missing split-repo package distribution contract. Once that seam exists, the
+canonical command path is: install the web workspace, run `@nmp/chirp-web`'s
+`build:vercel`, and publish `apps/web/dist`.
 
 Prebuilt uploads are diagnostic or emergency artifacts only. They are not the
 canonical production path and do not satisfy production-proof acceptance for
@@ -36,7 +38,7 @@ can see what is available now, what is locked behind identity, and where to go
 next without reading developer diagnostics.
 
 Chirp's production relay bootstrap is app/operator policy, single-sourced in
-`apps/chirp/crates/nmp-chirp-config`. It is not an NMP framework default and
+`crates/nmp-chirp-config`. It is not an NMP framework default and
 must not be duplicated in `nmp-core`, `nmp-defaults`, or `nmp-browser-runtime`. The production default set uses
 `wss://relay.primal.net` with role `"both,indexer"` because current
 production-browser evidence shows that role shape can keep a connected
@@ -65,7 +67,7 @@ TypeScript must not call `window.nostr.nip44` directly. NIP-46 bunker sign-in is
 a supported browser-runtime signer path when the shell supplies a `bunker_uri`;
 Rust owns the handshake, signer installation, and subsequent signing.
 The browser signer/private-flow capability matrix in
-[`docs/wasm-surface.md`](../wasm-surface.md#browser-signerprivate-flow-capability-model)
+[`docs/wasm-surface.md`](https://github.com/pablof7z/nostr-multi-platform/blob/master/docs/wasm-surface.md#browser-signerprivate-flow-capability-model)
 is the generic NMP contract that this product spec follows.
 
 ## Search Discovery Contract

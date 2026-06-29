@@ -1,21 +1,17 @@
 //! Marmot (MLS-over-Nostr encrypted groups) JNI entry points.
 //!
 //! Mirror of iOS `KernelHandle.registerActiveMarmotIfAvailable()` /
-//! `unregisterMarmotIfNeeded()` (Bridge/MarmotBridge.swift). Registration uses
-//! the actor-owned active local key — the secret never crosses the JNI seam
-//! (`nmp_marmot_register_active` reads it from the slot the kernel writes after
-//! every identity mutation). Once registered, the kernel pushes the
-//! `nmp.marmot.snapshot` / `nmp.marmot.messages` projections on every snapshot
-//! frame (V-107 / ADR-0039) and Kotlin reads Marmot state reactively from them;
-//! write ops (create_group / invite / send / accept_welcome …) route through the
-//! already-wired generic `nativeDispatchAction("nmp.marmot", …)` seam in
-//! `lib.rs` — no bespoke per-op JNI symbol.
+//! `unregisterMarmotIfNeeded()` (Bridge/MarmotBridge.swift). The current NMP
+//! migration removed the old reusable C shell before exposing the replacement
+//! active-registration seam. With `marmot` enabled these JNI calls still link,
+//! but `nmp_marmot_register_active` returns null and dispatch fails closed until
+//! pablof7z/nostr-multi-platform#2495 restores the NMP-owned seam.
 //!
 //! WHY this module exists at all: calling `nmp_marmot_register_active` /
 //! `nmp_marmot_unregister` through the `nmp_app_chirp::` RUST path (rather than
 //! an `extern "C"` block) is what makes rustc pull the `nmp_marmot_*` symbol
-//! bodies into the cdylib — the same retention mechanism documented at the top
-//! of `lib.rs` for the `nmp_app_*` family.
+//! bodies into the cdylib — currently fail-closed bodies owned by
+//! `nmp-app-chirp`, not copied Marmot internals.
 //!
 //! When the `marmot` feature is off (e.g. a plain `cargo build`), these entry
 //! points still exist so the Kotlin `external fun` bindings link, but
@@ -38,7 +34,8 @@ use nmp_app_chirp::{nmp_marmot_register_active, nmp_marmot_unregister, MarmotHan
 /// `db_dir` is the host app-support directory; the MLS SQLite state lives at
 /// `<db_dir>/marmot-mls-state.sqlite`. Returns `true` (1) when a handle was
 /// obtained, `false` (0) otherwise (no local key — e.g. signed out or a
-/// bunker/NIP-46 account — null `db_dir`, or the `marmot` feature disabled).
+/// bunker/NIP-46 account — null `db_dir`, the `marmot` feature disabled, or
+/// NMP #2495 still blocking active registration).
 ///
 /// Idempotent: any handle from a prior call is unregistered first, so this
 /// doubles as the account-switch re-register path (mirrors the
@@ -84,7 +81,7 @@ fn register_active(s: &Session, db_dir: &std::ffi::CStr) -> bool {
     // one (account switch / re-sign-in), mirroring iOS.
     unregister(s);
     // The keyring service id is Chirp product policy (D0); it lives in
-    // `nmp-chirp-config` rather than in the reusable `nmp-marmot` crate.
+    // `nmp-chirp-config`. NMP #2495 owns the reusable active-registration seam.
     let svc = CString::new(nmp_chirp_config::CHIRP_MARMOT_KEYRING_SERVICE_ID)
         .expect("static ASCII string is valid CStr");
     // `db_dir` is a valid NUL-terminated C string for the duration of this
@@ -108,8 +105,7 @@ fn register_active(_s: &Session, _db_dir: &std::ffi::CStr) -> bool {
 }
 
 /// Unregister and free the stored Marmot handle, if any. Idempotent. Called by
-/// `nativeFree` in `lib.rs` BEFORE `nmp_app_free` (the Marmot FFI contract
-/// requires `nmp_marmot_unregister` to run first).
+/// `nativeFree` in `lib.rs` BEFORE `nmp_app_free`.
 #[cfg(feature = "marmot")]
 pub(crate) fn unregister(s: &Session) {
     use std::sync::atomic::Ordering;

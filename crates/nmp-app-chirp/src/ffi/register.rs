@@ -6,7 +6,7 @@ use std::ffi::c_char;
 
 use nmp_core::__ffi_internal::is_hex_pubkey;
 use nmp_core::substrate::RoutingFactoryRegistrar;
-use nmp_ffi::NmpApp;
+use nmp_native_runtime::NmpApp;
 use nmp_nip01::meta_timeline::Pubkey;
 
 use nmp_nip02::register_follow_state_runtime;
@@ -125,14 +125,11 @@ pub extern "C" fn nmp_app_chirp_register(
     register_nip29_actions(unsafe { &mut *app });
     register_chirp_zap_identifier_action(unsafe { &mut *app });
 
-    // Visible timeline rows claim their relation streams through the same
-    // dispatch_action door as all other app verbs. The action module lives in
-    // nmp-relations (the cross-protocol social-relation crate) because its
-    // subscription shape spans reactions/reposts/zaps and is reusable by any
-    // note app.
-    //
-    // SAFETY: same exclusive-borrow rationale as `register_nip29_actions`.
-    nmp_relations::register_visible_note_relation_actions(unsafe { &mut *app });
+    // The large NMP migration removed the visible-note relation claim/release
+    // action from `nmp-relations`, leaving only the reusable classifier. Chirp
+    // must not recreate that cross-protocol relation subscription locally; the
+    // missing app-composition seam is tracked upstream in
+    // pablof7z/nostr-multi-platform#2496.
 
     // V-38: register the NIP-47 wallet stack (action modules + runtime
     // installation + status projection) when the `wallet` feature is on.
@@ -283,7 +280,7 @@ pub extern "C" fn nmp_app_chirp_register_follow_list(
 
     // Obtain the shared ContactsLookup — the same Arc that Kind3Parser writes
     // into via the ingest pipeline. Passed explicitly so register_follow_state_runtime
-    // stays generic (it only depends on nmp-core traits, not nmp-ffi).
+    // stays generic (it only depends on nmp-core traits, not nmp-native-runtime).
     let contacts_lookup = app_ref.contacts_lookup();
 
     register_follow_state_runtime(app_ref, contacts_lookup);

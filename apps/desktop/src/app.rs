@@ -849,10 +849,7 @@ mod ref_lifecycle_tests {
         let mut visible: HashSet<String> = HashSet::new();
         collect_feed_authors(&feed, &mut visible);
 
-        assert!(
-            visible.contains(&author),
-            "row author must be resolved"
-        );
+        assert!(visible.contains(&author), "row author must be resolved");
         assert!(
             visible.contains(&mentioned),
             "a non-author pubkey mentioned in the note body must also be resolved \
@@ -954,7 +951,11 @@ mod ref_lifecycle_tests {
     fn home_to_author_opens_b_with_nothing_to_release() {
         let b = AppTab::Author("b".repeat(64));
         let (close, open) = view_transition(&AppTab::Home, &b).expect("Home→Author transitions");
-        assert_eq!(close, ViewRef::None, "Home held no open-view ref to release");
+        assert_eq!(
+            close,
+            ViewRef::None,
+            "Home held no open-view ref to release"
+        );
         assert_eq!(open, ViewRef::Author("b".repeat(64)));
     }
 }

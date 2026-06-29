@@ -20,28 +20,24 @@ crate-type = ["staticlib", "rlib"]
 # `marmot` is intentionally absent: 5,400 LOC of MLS-over-Nostr is not on the
 # v1 critical path and excluded from the default build to keep CI fast.
 # The `justfile` iOS build targets pass `--features marmot` explicitly so the
-# Chirp iOS shell still links all `nmp_marmot_*` symbols.
+# Chirp iOS shell still links the fail-closed `nmp_marmot_*` symbols.
 default = ["wallet", "lmdb-backend"]
 # V-38: the `wallet` feature now activates the `nmp-nip47` optional dep
 # (the kernel itself no longer carries NIP-47 nouns). Chirp re-exports
 # it under the same name so callers (chirp-tui, the iOS shell) keep their
 # existing `features = ["wallet"]` spelling.
-# Marmot (MLS-over-Nostr) projection. Activates the `nmp-marmot` dependency
-# AND its `ffi` feature, which compiles the C-ABI shell
-# (`crates/nmp-marmot/src/ffi.rs` + siblings) and the `nmp_marmot_*` symbols.
-# The crate is a standalone buildable target for a future Marmot-only app;
-# Chirp picks up the symbols transparently via rlib linkage. The
-# `keyring-core` / `apple-native-keyring-store` deps live in `nmp-marmot`'s
-# `ffi` feature (no need to duplicate them here).
-# Deferred post-v1; off in a no-default-features build.
-marmot = ["dep:nmp-marmot", "nmp-marmot/ffi"]
-# NIP-47 Nostr Wallet Connect. V-38: forwards to the new `nmp-nip47` optional
-# dep (the kernel itself no longer carries NIP-47 nouns; `nmp-ffi`'s wallet
-# shims are now unconditional and route through dispatch_action to
-# `nmp-nip47`).
+# Marmot (MLS-over-Nostr) projection. The reusable C shell was deleted from NMP,
+# while the active-registration seam described by ADR-0025 has not been restored
+# on the current Rust API. Chirp keeps the ABI names fail-closed and tracks the
+# missing architecture in pablof7z/nostr-multi-platform#2495.
+marmot = []
+# NIP-47 Nostr Wallet Connect. V-38: forwards to the `nmp-nip47` optional dep;
+# wallet commands route through the typed dispatch doorway.
 wallet = ["dep:nmp-nip47"]
 # Persistent local cache / publish-intent ledger for offline-first Chirp.
 lmdb-backend = ["nmp-core/lmdb-backend"]
+# Android-only NIP-55 external-signer adapter methods on `NmpApp`.
+android-ffi = ["nmp-native-runtime/android-ffi"]
 
 [dependencies]
 nmp-core = { workspace = true }
@@ -51,12 +47,10 @@ nmp-planner = { workspace = true }
 # Direct dep on nmp-store for PullPage / ScanLogResult / EventStore /
 # StoreQuery / StoredEvent — the nmp_core::store compat facade is deleted (#1608).
 nmp-store = { workspace = true }
-# `nmp-ffi` owns the `NmpApp` C-ABI handle and the shared native C-ABI
-# symbols, including the NIP-46 broker adapter. Chirp's `nmp_app_chirp_register`
-# takes `*mut NmpApp`; the per-app crate names the handle + the FFI symbols
-# (`nmp_app_dispatch_action`, `nmp_signer_broker_init`, etc.) through this dep.
-nmp-ffi = { workspace = true, features = ["signer-broker"] }
-nmp-native-runtime = { workspace = true }
+# `nmp-native-runtime` owns the `NmpApp` handle and shared native runtime
+# methods after the reusable C ABI was deleted upstream. Chirp's app-owned FFI
+# glue takes `*mut NmpApp` but does not recreate framework C ABI symbols.
+nmp-native-runtime = { workspace = true, features = ["signer-broker"] }
 # Canonical NMP composition root (step 10 — V-48). One call wires the
 # default action modules (NIP-02 / NIP-17 / NIP-57 / NIP-65), the
 # kind:10050 ingest parser, the production routing substrate
@@ -75,6 +69,7 @@ nmp-native-runtime = { workspace = true }
 nmp-chirp-config = { path = "../nmp-chirp-config" }
 nmp-defaults = { workspace = true }
 nmp-feed = { workspace = true }
+nmp-content = { workspace = true }
 nmp-nip01 = { workspace = true }
 nmp-nip18 = { workspace = true }
 # Cross-protocol social-relation aggregation (#1728): the visible-note-relations
@@ -124,13 +119,6 @@ nmp-nip89 = { workspace = true }
 # behind the `wallet` feature so the default-off build excludes it.
 nmp-nip47 = { workspace = true, optional = true }
 nmp-threading = { workspace = true }
-# Marmot (MLS-over-Nostr). Layer-4 NIP crate that lives at
-# `crates/nmp-marmot/` (step 12 — returned from `apps/marmot/` after the
-# ADR-0025 retirement; the surviving `nmp_marmot_*` C-ABI cluster is
-# kernel-shaped per-app FFI, same pattern as `nmp_app_chirp_*`).
-# Optional + feature-gated (`marmot`): deferred post-v1, so the default-off
-# build excludes it.
-nmp-marmot = { workspace = true, optional = true }
 flatbuffers = { workspace = true }
 # `nostr` reconstructs typed `Event` / `Keys` / `PublicKey` / `RelayUrl`
 # values from the C-ABI JSON and builds the kind:444 message rumor.
@@ -140,26 +128,23 @@ nostr = { version = "0.44", default-features = false, features = ["std"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 zeroize.workspace = true
-# (The `keyring-core` + `apple-native-keyring-store` deps were relocated to
-# `nmp-marmot`'s `ffi` feature alongside `src/marmot/` — see the `marmot`
-# feature above. Chirp no longer references them directly.)
+# Chirp does not depend on Marmot storage/keyring crates while #2495 is open.
+# Reintroducing them here would hide the missing NMP architecture seam.
 
 [dev-dependencies]
-# Test-support gates expose `nmp_app_new` / `nmp_app_free` (and the
-# observer/projection test helpers via Rust path so the FFI
-# smoke tests in `src/ffi.rs` can spin up a real `NmpApp` rather than mocking
-# the slot. Matches the pattern in the other protocol crates (e.g. `nmp-nip01`).
+# Test-support gates expose runtime helpers so the FFI smoke tests in `src/ffi.rs`
+# can spin up a real `NmpApp` rather than mocking the slot. Matches the pattern
+# in the other protocol crates (e.g. `nmp-nip01`).
 nmp-core = { workspace = true, features = ["test-support"] }
-nmp-ffi = { workspace = true, features = ["test-support"] }
+nmp-native-runtime = { workspace = true, features = ["test-support", "signer-broker"] }
 # `nmp-codegen` supplies `SNAPSHOT_PROJECTIONS` for the registry-coverage gate
 # (`ffi::tests::producer_completeness::every_codegen_registry_key_is_registered_at_runtime`)
 # — every json_key the Swift codegen promises to decode must be a key the
 # kernel actually registers at runtime. Dev-only: the registry is a codegen
 # artifact, never a production dependency of the app crate.
 nmp-codegen = { workspace = true }
-# (The `mdk-sqlite-storage` + `mdk-core` dev-deps were relocated alongside
-# the Marmot FFI smoke tests to `nmp-marmot`'s `src/ffi/tests.rs`; Chirp no
-# longer references any MLS types directly.)
+# Chirp no longer references MLS storage types directly. Marmot validation is
+# tracked against the NMP architecture blocker instead of app-local test shims.
 # `nmp-nip59` supplies the `gift_wrap` primitive used in the DM-inbox
 # round-trip tests so the test fixtures construct kind:1059 envelopes through
 # the same production path the inbox unwraps (mirroring the unit tests in

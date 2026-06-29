@@ -4,11 +4,11 @@ use std::collections::HashMap;
 use std::ffi::{c_char, CStr, CString};
 use std::sync::{Mutex, OnceLock};
 
+use crate::{nmp_app_free, nmp_app_new, nmp_app_set_capability_callback};
 use nmp_core::substrate::{
     CapabilityEnvelope, CapabilityModule, CapabilityRequest, KeyringCapability, KeyringRequest,
     KeyringResult,
 };
-use nmp_ffi::{nmp_app_free, nmp_app_new, nmp_app_set_capability_callback};
 
 use super::super::nmp_app_chirp_identity_sign_in_nsec;
 
