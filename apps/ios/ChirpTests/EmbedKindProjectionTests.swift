@@ -7,7 +7,7 @@ import SwiftUI
 // Issue #1283 Phase 1: the in-Swift `match kind` embed RESOLVER was deleted —
 // kind dispatch + tag/JSON parsing now lives in Rust
 // (`nmp_content::resolve_embed_projection`), covered by the Rust codec +
-// nmp-ffi round-trip tests. So these tests no longer exercise resolution; they
+// Chirp FFI round-trip tests. So these tests no longer exercise resolution; they
 // exercise what Swift still owns:
 //   1. EmbedHost stores the pre-resolved `[String: EmbeddedEventEnvelope]` map
 //      decoded from the typed sidecar (decode-only — no resolution).

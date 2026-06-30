@@ -17,7 +17,7 @@ import XCTest
 ///
 ///  1. **Process-shared kernel.** `nmp_app_new()` → `nmp_app_free()` →
 ///     `nmp_app_new()` in one process SEGVs when relay sockets were live
-    ///     during the free (`crates/nmp-ffi/src/lib.rs`,
+    ///     during the free (`crates/nmp-app-chirp/src/ffi/runtime_ffi.rs`,
     ///     `crates/nmp-network/src/relay_worker/mod.rs`). The suite uses ONE shared
 ///     `KernelModel`; scenarios run additively in XCTest's default
 ///     alphabetical method order (2 < 3 < 4 < 6).

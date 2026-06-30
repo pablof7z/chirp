@@ -169,8 +169,7 @@ struct GroupChatView: View {
         // Fire-and-forget: the sent message reappears via the next snapshot
         // tick. Clearing the draft optimistically matches `ComposeView` /
         // `MarmotGroupChatView`. A non-nil `replyTarget` routes the send to
-        // `nmp.nip29.comment_in_group` (a kind:1111 reply); the verb choice is
-        // the store's, not the view's (thin-shell rule).
+        // kind:1111 group replies are routed by the store, not the view.
         store.sendMessage(text, replyToEventId: replyTarget?.id)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         draft = ""
@@ -182,10 +181,10 @@ struct GroupChatView: View {
 
 private struct GroupChatMessageRow: View {
     let message: GroupEvent
-    /// Long-press → "React ❤️": dispatches `nmp.nip29.react_in_group`.
+    /// Long-press → "React ❤️": publishes a kind:7 group event.
     let onReact: () -> Void
     /// Long-press → "Reply": arms the composer's reply target so the next
-    /// send dispatches `nmp.nip29.comment_in_group`.
+    /// send publishes a kind:1111 group event.
     let onReply: () -> Void
 
     var body: some View {

@@ -1,6 +1,6 @@
 use std::sync::mpsc::{self, Receiver, Sender};
 
-use nmp_ffi::NmpApp;
+use nmp_app_chirp::ffi::NmpApp;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NmpEvent {
@@ -47,12 +47,12 @@ impl NmpUpdateBridge {
 
     pub fn register(app: *mut NmpApp, bridge: &mut Box<Self>) {
         let context = bridge.as_mut() as *mut Self as *mut std::ffi::c_void;
-        nmp_ffi::nmp_app_set_update_callback(app, context, Some(on_update));
+        nmp_app_chirp::ffi::nmp_app_set_update_callback(app, context, Some(on_update));
     }
 }
 
 pub fn unregister(app: *mut NmpApp) {
-    nmp_ffi::nmp_app_set_update_callback(app, std::ptr::null_mut(), None);
+    nmp_app_chirp::ffi::nmp_app_set_update_callback(app, std::ptr::null_mut(), None);
 }
 
 extern "C" fn on_update(context: *mut std::ffi::c_void, payload: *const u8, len: usize) {

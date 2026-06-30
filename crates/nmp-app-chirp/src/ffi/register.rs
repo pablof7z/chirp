@@ -5,8 +5,8 @@
 use std::ffi::c_char;
 
 use nmp_core::__ffi_internal::is_hex_pubkey;
-use nmp_core::substrate::RoutingFactoryRegistrar;
-use nmp_ffi::NmpApp;
+use nmp_core::substrate::{ProtocolDescriptor, RoutingFactoryRegistrar};
+use nmp_native_runtime::NmpApp;
 use nmp_nip01::meta_timeline::Pubkey;
 
 use nmp_nip02::register_follow_state_runtime;
@@ -89,41 +89,64 @@ pub extern "C" fn nmp_app_chirp_register(
         }
     };
 
-    // Inherit canonical NMP composition once and keep runtime handles the
-    // Chirp feed needs for app-level wiring. Shared NMP defaults intentionally
-    // carry no operator relay URLs; Chirp threads its app-owned search relay
-    // policy through this composition seam.
-    let default_handles = nmp_defaults::register_defaults_with_handles(
-        unsafe { &mut *app },
-        nmp_defaults::NmpDefaults {
-            search_defaults: nmp_defaults::SearchDefaults::with_default_relays(
-                nmp_chirp_config::chirp_default_search_relays(),
-            ),
-            client_identity: Some(nmp_nip89::ClientIdentity {
-                name: "Chirp".to_string(),
-                version: Some(env!("CARGO_PKG_VERSION").to_string()),
-                handler: None,
-            }),
-            attach_client_tag: true,
-            ..Default::default()
-        },
+    // SAFETY: caller guarantees `app` is a valid NmpApp allocated by
+    // `nmp_app_new`. Registration is a pre-start composition phase and this
+    // function does not hold the borrow past return.
+    let app_mut = unsafe { &mut *app };
+
+    // Install the substrate floor first: routing, mailbox/profile/contact
+    // caches, parsers, publish resolver, raw-event forwarding, coverage, and
+    // NIP-77 sync hooks. Protocol features are composed explicitly below by
+    // their owner crates so the app root stays grep-able.
+    let _substrate_handles =
+        nmp_substrate::install(app_mut, nmp_substrate::SubstrateConfig::default());
+
+    nmp_nip50::register_search_scopes(app_mut);
+    nmp_nip50::register_input_scopes(app_mut);
+
+    nmp_nip02::register_follow_actions(app_mut);
+    nmp_replies::register_actions(app_mut);
+    ProtocolDescriptor::register_actions(&nmp_nip25::Nip25Descriptor, app_mut);
+    ProtocolDescriptor::register_actions(&nmp_nip18::Nip18Descriptor, app_mut);
+    ProtocolDescriptor::register_actions(&nmp_nip84::Nip84Descriptor, app_mut);
+    nmp_nip57::register_actions(app_mut);
+    nmp_nip29::register_input_scopes(app_mut);
+
+    let _wot_runtime = nmp_wot::register_runtime(app_mut);
+    let mute = nmp_nip51::register_mute_runtime(app_mut);
+    let _bookmark_runtime = nmp_nip51::register_bookmark_runtime(app_mut);
+    nmp_nip51::register_bookmark_set_runtime(app_mut);
+    nmp_nip51::register_web_bookmark_runtime(app_mut);
+    let _search_relay_runtime = nmp_nip51::register_search_relay_runtime_with_fallbacks(
+        app_mut,
+        nmp_nip50::SearchFallbackRelays::new(nmp_chirp_config::chirp_default_search_relays()),
     );
+    let _comment_runtime = nmp_nip22::register_runtime(app_mut);
+
+    nmp_nip17::register_actions(app_mut);
+    nmp_nip17::register_runtime(app_mut);
+    nmp_content::register_longform_projection(app_mut);
+
+    let client_identity = nmp_nip89::ClientIdentity {
+        name: "Chirp".to_string(),
+        version: Some(env!("CARGO_PKG_VERSION").to_string()),
+        handler: None,
+    };
+    app_mut.set_relay_user_agent(client_identity.user_agent());
+    app_mut.set_outbound_public_tags(vec![client_identity.client_tag()]);
 
     // #1493 P9 — Chirp's `nostrconnect://` NIP-46 perm policy (leaf-app product
     // policy; NMP owns no default), set at this single pre-start chokepoint.
     let perms = nmp_chirp_config::chirp_nostrconnect_perms().to_string();
-    RoutingFactoryRegistrar::set_nostrconnect_perms(unsafe { &*app }, perms);
+    app_mut.set_nostrconnect_perms(perms);
 
     // Chirp-specific: register the NIP-29 group-chat `ActionModule`s
     // against the kernel. Lives in this crate (not the template) because
     // NIP-29 is not part of the canonical NMP composition every Nostr
     // app inherits — a notes-only app would not register it.
     //
-    // SAFETY: same exclusive-borrow rationale as the
-    // `register_defaults` call above — no other reference aliases `app`
-    // at this point.
-    register_nip29_actions(unsafe { &mut *app });
-    register_chirp_zap_identifier_action(unsafe { &mut *app });
+    register_nip29_actions(app_mut);
+    register_chirp_zap_identifier_action(app_mut);
 
     // Visible timeline rows claim their relation streams through the same
     // dispatch_action door as all other app verbs. The action module lives in
@@ -131,26 +154,19 @@ pub extern "C" fn nmp_app_chirp_register(
     // subscription shape spans reactions/reposts/zaps and is reusable by any
     // note app.
     //
-    // SAFETY: same exclusive-borrow rationale as `register_nip29_actions`.
-    nmp_relations::register_visible_note_relation_actions(unsafe { &mut *app });
+    nmp_relations::register_visible_note_relation_actions(app_mut);
 
     // V-38: register the NIP-47 wallet stack (action modules + runtime
     // installation + status projection) when the `wallet` feature is on.
     // The crate `nmp-nip47` owns the runtime, the three connect / disconnect
     // / pay_invoice action modules, and the `"wallet"` projection wiring;
     // Chirp drives the registration here so a single call covers the
-    // host-side glue. Other action modules (NIP-02 / NIP-17 / NIP-57 /
-    // NIP-65) are wired transitively by `nmp_defaults::register_defaults`
-    // above.
-    //
-    // SAFETY: same exclusive-borrow rationale as `register_chirp_actions`.
+    // host-side glue. The other reusable action modules are wired above by
+    // their owner crates.
     #[cfg(feature = "wallet")]
-    crate::wallet_runtime::register_nip47_wallet(unsafe { &mut *app });
+    crate::wallet_runtime::register_nip47_wallet(app_mut);
 
-    // SAFETY: caller guarantees `app` is a valid pointer allocated by
-    // `nmp_app_new` for the duration of this call. We do not hold the
-    // borrow past this function.
-    let app_ref = unsafe { &*app };
+    let app_ref: &NmpApp = app_mut;
 
     // #626: wire the NIP-29 group-create defaults projection so Chirp's
     // app-owned suggested public-group relay URL surfaces under
@@ -174,27 +190,21 @@ pub extern "C" fn nmp_app_chirp_register(
     // non-followed author's note surfaces THAT note tagged "↳ <follow> replied
     // in thread".
     //
-    // `register_op_feed_defaults` is the one-line composition affordance from
-    // `nmp-defaults`: it constructs the `ActiveFollowSet` over the app's
-    // authoritative active-account slot, wires the follow predicate + event
-    // lookup + actor claim sink + card builder into the `nmp-nip01` OP-feed
-    // engine, and opens declared observed projections for ingest plus a
-    // `FeedController` under `"nmp.feed.home"` (output). It also registers the
-    // `ActiveFollowSet` through declared observed projection delivery for kind:3
-    // ingest and on `NmpApp`'s identity-change observer so sign-in, switch,
-    // logout, and reset proactively clear stale OP-feed state.
-    let defaults = match default_handles.mute {
-        Some(mute) => {
-            nmp_native_runtime::register_op_feed_defaults_with_mute(app_ref, viewer, vec![1], mute)
-        }
-        None => nmp_native_runtime::register_op_feed_defaults(app_ref, viewer, vec![1]),
-    };
+    // `register_op_feed_defaults_with_mute` constructs the `ActiveFollowSet`
+    // over the app's authoritative active-account slot, wires the follow
+    // predicate + event lookup + actor claim sink + card builder into the
+    // `nmp-nip01` OP-feed engine, and opens declared observed projections for
+    // ingest plus a `FeedController` under `"nmp.feed.home"` (output). It also
+    // registers the `ActiveFollowSet` through declared observed projection
+    // delivery for kind:3 ingest and on `NmpApp`'s identity-change observer so
+    // sign-in, switch, logout, and reset proactively clear stale OP-feed state.
+    let defaults =
+        nmp_native_runtime::register_op_feed_defaults_with_mute(app_ref, viewer, vec![1], mute);
 
     // ADR-0037 typed sidecar for nmp.feed.home IS wired:
-    // `register_op_feed_defaults` step 5b (nmp-defaults
-    // op_feed_defaults.rs) registers the NOFS typed-FB encoder alongside the
-    // JSON projection, and iOS `TypedHomeFeedDecoder` consumes it typed-first
-    // (JSON remains the ADR-0037 Commitment-4 fallback).
+    // the native runtime registers the NOFS typed-FB encoder alongside the JSON
+    // projection, and iOS `TypedHomeFeedDecoder` consumes it typed-first (JSON
+    // remains the ADR-0037 Commitment-4 fallback).
     // D6 — guard the write-through before allocating the handle. A null
     // `handle_out` is a programmer-error contract violation: returning an
     // error code here (instead of a segfault) is the safe, D6-compliant
@@ -229,7 +239,7 @@ pub extern "C" fn nmp_app_chirp_register_dm_inbox(app: *mut NmpApp) {
     // SAFETY: caller guarantees `app` is a valid pointer from `nmp_app_new`,
     // live for the duration of this call. The borrow is not held past return.
     let app_ref = unsafe { &*app };
-    nmp_defaults::runtimes::register_dm_runtime(app_ref);
+    nmp_nip17::register_runtime(app_ref);
 }
 
 /// Wire the NIP-02 follow-list runtime into `app` (Chirp FFI entry point).
@@ -283,7 +293,7 @@ pub extern "C" fn nmp_app_chirp_register_follow_list(
 
     // Obtain the shared ContactsLookup — the same Arc that Kind3Parser writes
     // into via the ingest pipeline. Passed explicitly so register_follow_state_runtime
-    // stays generic (it only depends on nmp-core traits, not nmp-ffi).
+    // stays generic (it only depends on nmp-core traits, not this app crate).
     let contacts_lookup = app_ref.contacts_lookup();
 
     register_follow_state_runtime(app_ref, contacts_lookup);

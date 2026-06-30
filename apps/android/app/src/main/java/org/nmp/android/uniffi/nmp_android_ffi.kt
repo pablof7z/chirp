@@ -1425,7 +1425,7 @@ public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
  * ## `legacy_jni_session_id()`
  *
  * Returns the internal session registry id used by residual JNI lanes
- * (signer, capability, marmot, identity). It is NOT permission to use
+ * (signer and capability). It is NOT permission to use
  * this id for app-loop operations from new Kotlin code.
  */
 public interface AppHandleInterface {
@@ -1463,8 +1463,7 @@ public interface AppHandleInterface {
      * Dispatch from a `(namespace, body_json)` pair.
      *
      * JSON adapter for namespaces that pre-date the FlatBuffers write boundary:
-     * kept as a RESIDUAL for the Marmot hybrid builder path (#2169) and the
-     * terminal-UI (TUI) consumer. The intent/action-spec path is GONE (M14-1 /
+     * kept for the terminal-UI (TUI) consumer. The intent/action-spec path is GONE (M14-1 /
      * #2145); all Chirp social write verbs use `dispatch_action_bytes` with
      * generated builders. Routes through the same typed byte doorway
      * (`nmp_app_dispatch_action_bytes`) as `dispatch_action_bytes`.
@@ -1475,9 +1474,8 @@ public interface AppHandleInterface {
     /**
      * Session registry id for residual JNI lanes.
      *
-     * Returns the `jlong` handle that signer, capability, marmot, and
-     * identity JNI functions use to look up the kernel session. NOT for
-     * app-loop operations.
+     * Returns the `jlong` handle that signer and capability JNI functions use
+     * to look up the kernel session. NOT for app-loop operations.
      */
     fun `legacyJniSessionId`(): kotlin.Long
     
@@ -1538,7 +1536,7 @@ public interface AppHandleInterface {
  * ## `legacy_jni_session_id()`
  *
  * Returns the internal session registry id used by residual JNI lanes
- * (signer, capability, marmot, identity). It is NOT permission to use
+ * (signer and capability). It is NOT permission to use
  * this id for app-loop operations from new Kotlin code.
  */
 open class AppHandle: Disposable, AutoCloseable, AppHandleInterface
@@ -1690,8 +1688,7 @@ open class AppHandle: Disposable, AutoCloseable, AppHandleInterface
      * Dispatch from a `(namespace, body_json)` pair.
      *
      * JSON adapter for namespaces that pre-date the FlatBuffers write boundary:
-     * kept as a RESIDUAL for the Marmot hybrid builder path (#2169) and the
-     * terminal-UI (TUI) consumer. The intent/action-spec path is GONE (M14-1 /
+     * kept for the terminal-UI (TUI) consumer. The intent/action-spec path is GONE (M14-1 /
      * #2145); all Chirp social write verbs use `dispatch_action_bytes` with
      * generated builders. Routes through the same typed byte doorway
      * (`nmp_app_dispatch_action_bytes`) as `dispatch_action_bytes`.
@@ -1712,9 +1709,8 @@ open class AppHandle: Disposable, AutoCloseable, AppHandleInterface
     /**
      * Session registry id for residual JNI lanes.
      *
-     * Returns the `jlong` handle that signer, capability, marmot, and
-     * identity JNI functions use to look up the kernel session. NOT for
-     * app-loop operations.
+     * Returns the `jlong` handle that signer and capability JNI functions use
+     * to look up the kernel session. NOT for app-loop operations.
      */override fun `legacyJniSessionId`(): kotlin.Long {
             return FfiConverterLong.lift(
     callWithPointer {
@@ -1973,4 +1969,3 @@ public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?>
         }
     }
 }
-

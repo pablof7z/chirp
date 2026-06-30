@@ -76,14 +76,16 @@ extension KernelHandle {
     /// Claim the tailing interest for `eventID`'s visible relations.
     ///
     /// Uses the typed byte doorway (`nmp_app_dispatch_action_bytes`, #2170):
-    /// op `0` = `VisibleNoteRelationsOp::Claim`.
+    /// lifecycle `0` = `VisibleNoteRelationsLifecycle::Claim`.
     func claimVisibleNoteRelations(eventID: String) {
         let id = UUID().uuidString
         let bytes = GeneratedActionBuilders.visibleNoteRelations(
             correlationId: id,
-            op: 0, // VisibleNoteRelationsOp::Claim
-            eventId: eventID,
-            consumerId: "ios.visible-note:\(eventID)"
+            lifecycle: 0,
+            targetEventId: eventID,
+            targetKind: 1,
+            consumerId: "ios.visible-note:\(eventID)",
+            targetAddress: nil
         )
         _ = dispatchBytes(bytes)
     }
@@ -91,14 +93,16 @@ extension KernelHandle {
     /// Release the tailing interest for `eventID`'s visible relations.
     ///
     /// Uses the typed byte doorway (`nmp_app_dispatch_action_bytes`, #2170):
-    /// op `1` = `VisibleNoteRelationsOp::Release`.
+    /// lifecycle `1` = `VisibleNoteRelationsLifecycle::Release`.
     func releaseVisibleNoteRelations(eventID: String) {
         let id = UUID().uuidString
         let bytes = GeneratedActionBuilders.visibleNoteRelations(
             correlationId: id,
-            op: 1, // VisibleNoteRelationsOp::Release
-            eventId: eventID,
-            consumerId: "ios.visible-note:\(eventID)"
+            lifecycle: 1,
+            targetEventId: eventID,
+            targetKind: 1,
+            consumerId: "ios.visible-note:\(eventID)",
+            targetAddress: nil
         )
         _ = dispatchBytes(bytes)
     }

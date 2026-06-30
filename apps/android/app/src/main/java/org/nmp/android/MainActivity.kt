@@ -68,20 +68,16 @@ class MainActivity : ComponentActivity(), SignInAmberDelegate {
         // signed-in user survives a restart. Mirrors iOS, which registers its
         // keychain capability + restores unconditionally at launch.
         //
-        // E2E test seams: adb shell am start -e nmp.test_nsec <nsec>
-        //                                   -e nmp.test_relays '[["ws://…","both"]]'
-        // Both extras are null in production (absent, or in release builds where
+        // E2E test seam: adb shell am start -e nmp.test_relays '[["ws://...","both"]]'
+        // The extra is null in production (absent, or in release builds where
         // BuildConfig.DEBUG is false) and merely ride on top of the same launch
         // path. Kotlin ferries the raw strings verbatim; all parsing and policy
         // live in Rust (D7).
-        val testNsec: String? = if (BuildConfig.DEBUG)
-            intent?.getStringExtra("nmp.test_nsec") else null
         val testRelays: String? = if (BuildConfig.DEBUG)
             intent?.getStringExtra("nmp.test_relays") else null
         model.start(
             context = this,
             storagePath = kernelStoragePath(),
-            testNsec = testNsec,
             testRelays = testRelays,
         )
         setContent {

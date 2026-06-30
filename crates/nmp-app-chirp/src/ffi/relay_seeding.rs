@@ -24,7 +24,7 @@
 
 use std::ffi::{c_char, CStr};
 
-use nmp_ffi::{nmp_app_add_relay, NmpApp};
+use nmp_native_runtime::NmpApp;
 
 /// Seed the Chirp reference relay set onto `app`.
 ///
@@ -40,16 +40,10 @@ pub extern "C" fn nmp_app_chirp_seed_default_relays(app: *mut NmpApp) -> bool {
     }
     let mut seeded = false;
     for entry in nmp_chirp_config::chirp_default_relay_bootstrap() {
-        let (Ok(url), Ok(role)) = (
-            std::ffi::CString::new(entry.url),
-            std::ffi::CString::new(entry.role),
-        ) else {
-            continue;
-        };
-        // `nmp_app_add_relay` is the framework seam; it dedups against any
+        // `NmpApp::add_relay` is the framework seam; it dedups against any
         // session-restored relay rows, so re-seeding an existing install is a
         // no-op on the kernel side.
-        nmp_app_add_relay(app, url.as_ptr(), role.as_ptr());
+        unsafe { &*app }.add_relay(entry.url.to_string(), entry.role.to_string());
         seeded = true;
     }
     seeded
@@ -95,13 +89,7 @@ fn seed_relays_from_json_str(app: *mut NmpApp, json: &str) -> bool {
     }
     let mut seeded = false;
     for entry in &parsed {
-        let (Ok(url), Ok(role)) = (
-            std::ffi::CString::new(entry[0].as_str()),
-            std::ffi::CString::new(entry[1].as_str()),
-        ) else {
-            continue;
-        };
-        nmp_app_add_relay(app, url.as_ptr(), role.as_ptr());
+        unsafe { &*app }.add_relay(entry[0].clone(), entry[1].clone());
         seeded = true;
     }
     seeded

@@ -1,12 +1,12 @@
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{CStr, CString};
 
+use nmp_app_chirp::ffi::{nmp_free_string, NmpApp};
 use nmp_app_chirp::{nmp_app_close_feed, nmp_app_open_feed};
 use nmp_feed::{
     FeedAdmission, FeedParams, FeedRanking, FeedRender, FeedScope, FeedWindow, ProjectionKey,
     DEFAULT_FEED_WINDOW_LIMIT,
 };
-use nmp_ffi::{nmp_free_string, NmpApp};
 use serde_json::Value;
 
 use crate::Result;

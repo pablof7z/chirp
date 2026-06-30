@@ -12,17 +12,18 @@ path = "src/main.rs"
 [dependencies]
 # Chirp composition root — brings in modular timeline, DM inbox, follow list,
 # action modules, and all per-app FFI symbols. Same feature set as chirp-tui.
-nmp-app-chirp = { path = "../../crates/nmp-app-chirp", default-features = false, features = ["marmot", "wallet"] }
+nmp-app-chirp = { path = "../../crates/nmp-app-chirp", default-features = false, features = ["wallet"] }
 
 # Shared Chirp app configuration — relay bootstrap defaults.
 nmp-chirp-config = { path = "../../crates/nmp-chirp-config" }
 
-# C-ABI surface (NmpApp, nmp_app_* symbols).
-nmp-ffi = { workspace = true }
 nmp-feed = { workspace = true }
 
 # In-process kernel: we still decode FlatBuffer frames and use display helpers.
 nmp-core = { workspace = true }
+
+# NIP-19/21 typed identifiers live in their owner crate, not the kernel crate.
+nmp-nostr-id = { workspace = true }
 
 # NIP-01 typed OP-feed codec: decode_op_feed_snapshot + OP_FEED_SCHEMA_ID for
 # the typed sidecar render cutover (ADR-0038).
@@ -49,4 +50,3 @@ keyring = { version = "3.6.3", default-features = false, features = ["apple-nati
 
 [dev-dependencies]
 nmp-core = { workspace = true, features = ["test-support"] }
-nmp-ffi = { workspace = true, features = ["test-support"] }

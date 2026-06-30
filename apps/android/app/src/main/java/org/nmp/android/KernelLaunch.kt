@@ -8,15 +8,14 @@ package org.nmp.android
  * The production implementation is [KernelModel]'s private adapter over its
  * [KernelBridge] + [KeystoreKeyringCapability]; tests substitute a recording
  * fake. The interface is deliberately ordered by lifecycle phase, mirroring iOS
- * `KernelModel` (`registerCapabilityHandler` in `init` → `start()` →
- * `restoreChirpIdentity`).
+ * `KernelModel` (`registerCapabilityHandler` before `start()`).
  */
 interface KernelLaunchSeam {
     /**
      * Install the Android Keystore keyring capability so the kernel can both
      * persist the active secret on sign-in and read it back on cold start. Must
-     * run BEFORE [identityRestore] (and before the kernel actor's Start command
-     * runs the synchronous restore-read chain).
+     * run BEFORE [startKernel] because the kernel actor's Start command runs
+     * the synchronous restore-read chain.
      */
     fun installKeyringCapability()
 
@@ -26,12 +25,6 @@ interface KernelLaunchSeam {
     /** Wire the push update + signer-request listeners. */
     fun wireListeners()
 
-    /**
-     * Restore a persisted identity. In production [testNsec] is null and the
-     * kernel reads the secret from the keyring capability installed above; tests
-     * may inject a secret to sign in deterministically.
-     */
-    fun identityRestore(dbDir: String, testNsec: String?)
 }
 
 /**
@@ -44,17 +37,14 @@ interface KernelLaunchSeam {
  * kernel's persist-on-sign-in writes and restore-on-start reads both route
  * through that capability) and logged the user out on every restart.
  *
- * [testNsec] / [testRelays] are null in production and ride on top of the same
- * path when a headless UI test injects them — they never select an alternate
- * orchestration (do-the-right-thing: one path, optional injection).
+ * [testRelays] is null in production and rides on top of the same path when a
+ * headless UI test injects it — it never selects an alternate orchestration.
  *
  * Pure (no Android types): drives the [seam] in lifecycle order.
  */
 fun planKernelLaunch(
     seam: KernelLaunchSeam,
     storagePath: String?,
-    dbDir: String,
-    testNsec: String?,
     testRelays: String?,
 ) {
     // 1. Keyring capability first — the kernel's Start command (below) runs the
@@ -64,9 +54,6 @@ fun planKernelLaunch(
     seam.startKernel(storagePath, testRelays)
     // 3. Wire the push listeners so snapshots/signer requests flow.
     seam.wireListeners()
-    // 4. Register Marmot against the (now restored) active key / inject a test
-    //    nsec. Reads the persisted secret from the capability in production.
-    seam.identityRestore(dbDir, testNsec)
 }
 
 /**
@@ -102,9 +89,5 @@ class BridgeLaunchSeam(
     override fun wireListeners() {
         bridge.setUpdateListener { bytes -> applyFrame(bytes) }
         bridge.setSignerRequestListener { requestJson -> onSignerRequest(requestJson) }
-    }
-
-    override fun identityRestore(dbDir: String, testNsec: String?) {
-        bridge.identityRestore(dbDir = dbDir, testNsec = testNsec)
     }
 }

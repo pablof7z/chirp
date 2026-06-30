@@ -801,20 +801,25 @@ public enum GeneratedActionBuilders {
     /// Builds the `nmp.nip01.visible_note_relations` `DispatchEnvelope` bytes for the byte doorway.
     public static func visibleNoteRelations(
         correlationId: String,
-        op: UInt8,
-        eventId: String,
-        consumerId: String
+        lifecycle: UInt8,
+        targetEventId: String,
+        targetKind: UInt32,
+        consumerId: String,
+        targetAddress: String?
     ) -> [UInt8] {
         var fbb = FlatBufferBuilder()
-        let eventIdOffset = fbb.create(string: eventId)
+        let targetEventIdOffset = fbb.create(string: targetEventId)
         let consumerIdOffset = fbb.create(string: consumerId)
-        let payloadStart = fbb.startTable(with: 4)
+        let targetAddressOffset: Offset = targetAddress.map { fbb.create(string: $0) } ?? Offset()
+        let payloadStart = fbb.startTable(with: 6)
         fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
-        fbb.add(element: op, def: UInt8(0), at: 6) // slot 1: op
-        fbb.add(offset: eventIdOffset, at: 8) // slot 2: eventId
-        fbb.add(offset: consumerIdOffset, at: 10) // slot 3: consumerId
+        fbb.add(element: lifecycle, def: UInt8(0), at: 6) // slot 1: lifecycle
+        fbb.add(offset: targetEventIdOffset, at: 8) // slot 2: targetEventId
+        fbb.add(element: UInt32(targetKind), def: UInt32(0), at: 10) // slot 3: targetKind
+        fbb.add(offset: consumerIdOffset, at: 12) // slot 4: consumerId
+        if targetAddressOffset.o != 0 { fbb.add(offset: targetAddressOffset, at: 14) } // slot 5: targetAddress
         let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
-        fbb.finish(offset: payloadRoot, fileId: "NR01")
+        fbb.finish(offset: payloadRoot, fileId: "VNRL")
         let payload = fbb.sizedByteArray
         return encodeDispatchEnvelope(
             correlationId: correlationId,

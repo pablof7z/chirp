@@ -8,12 +8,12 @@ use jni::objects::{JClass, JString};
 use jni::sys::{jlong, jstring};
 use jni::JNIEnv;
 
+use nmp_app_chirp::ffi::{nmp_free_string, NmpApp};
 use nmp_app_chirp::{nmp_app_close_feed, nmp_app_open_feed};
 use nmp_feed::{
     FeedAdmission, FeedParams, FeedRanking, FeedRender, FeedScope, FeedWindow, ProjectionKey,
     DEFAULT_FEED_WINDOW_LIMIT,
 };
-use nmp_ffi::{nmp_free_string, NmpApp};
 use serde_json::Value;
 
 use crate::{jstring_to_cstring, session_arc};

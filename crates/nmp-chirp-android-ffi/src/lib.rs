@@ -16,9 +16,9 @@
 //!   `nativeDispatchIntentBytes`, `nativeDispatchActionBytes`.
 //!
 //! * **Residual JNI lanes** (staged for future migration):
-//!   signer, external-signer/NIP-55, capability, identity, marmot, platform,
-//!   action stage-ack/retry/cancel, flat-feed, claims, relay management,
-//!   account management, session utility helpers.
+//!   signer, external-signer/NIP-55, capability, platform, action
+//!   stage-ack/retry/cancel, flat-feed, claims, relay management, account
+//!   management, session utility helpers.
 //!
 //! Doctrine: no business logic or cached state here (D5/D8) — pure transport.
 //! Errors never cross FFI (D6): the kernel reports via update frames. Init-only
@@ -42,7 +42,6 @@ mod claims;
 mod external_signer;
 mod flat_feed;
 mod identity;
-mod marmot;
 mod platform;
 mod relay_seeding;
 mod session;
@@ -50,12 +49,12 @@ mod signer;
 mod signer_request_listener;
 mod uniffi_app_loop;
 mod update_listener;
-use nmp_app_chirp::nmp_app_chirp_create_new_account;
-use nmp_ffi::{
+use nmp_app_chirp::ffi::{
     nmp_app_add_relay, nmp_app_encode_profile, nmp_app_remove_account, nmp_app_remove_relay,
     nmp_app_signin_nsec, nmp_app_switch_active, nmp_free_string,
 };
-pub(crate) use session::{session_arc, Session};
+use nmp_app_chirp::nmp_app_chirp_create_new_account;
+pub(crate) use session::session_arc;
 
 /// Seed the relay list from a JSON string override or the Chirp defaults.
 ///
@@ -171,7 +170,7 @@ pub extern "system" fn Java_org_nmp_android_KernelBridge_nativeEncodeProfile(
         .to_string_lossy()
         .into_owned();
     // SAFETY: `nmp_free_string` is the canonical free for C-strings
-    // allocated by any NMP FFI function (nmp-ffi/src/free.rs).
+    // allocated by any Chirp-owned NMP FFI function.
     nmp_free_string(raw_ptr);
     env.new_string(encoded)
         .map(|s| s.into_raw())

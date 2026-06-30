@@ -16,7 +16,7 @@ use jni::sys::{jlong, jstring};
 use jni::JNIEnv;
 
 use nmp_app_chirp::dispatch_action_bytes_for;
-use nmp_ffi::{nmp_app_ack_action_stage, nmp_app_cancel_action, nmp_app_retry_publish};
+use nmp_app_chirp::ffi::{nmp_app_ack_action_stage, nmp_app_cancel_action, nmp_app_retry_publish};
 use serde_json::json;
 
 use crate::{jstring_to_cstring, session_arc};

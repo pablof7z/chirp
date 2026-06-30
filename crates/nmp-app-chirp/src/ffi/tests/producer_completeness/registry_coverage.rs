@@ -36,10 +36,11 @@
 //! and are exempt rather than asserted-on; deleting them from the registry is
 //! tracked separately).
 //!
-//! `nmp.marmot.*` is exempt unless this crate's `marmot` feature is enabled:
-//! the Marmot registration (and its 5,400-LOC MLS dependency tree) is
-//! feature-gated out of the default test build, so the producer cannot be
-//! observed here; the Marmot crate's own tests own that proof.
+//! `nmp.marmot.*` is exempt here: the Marmot C-handle shell was removed from
+//! Chirp, and no Chirp-owned producer currently registers those projections.
+//! The generated decoders remain historical artifacts until the consumer
+//! registry is regenerated without them or a real Rust-owned Marmot install API
+//! exists.
 //!
 //! ## Synchronisation (no polling)
 //!
@@ -52,23 +53,22 @@
 //! `recv_timeout` is a blocking wait on a real channel, not a sleep loop.
 
 use std::collections::BTreeSet;
-use std::ffi::{CString, c_void};
-use std::sync::mpsc::{Sender, channel};
+use std::ffi::{c_void, CString};
+use std::sync::mpsc::{channel, Sender};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
+use super::super::super::{
+    nmp_app_free, nmp_app_new, nmp_app_set_update_callback, nmp_app_start, NmpApp,
+};
 use nmp_codegen::swift_projections_registry::SNAPSHOT_PROJECTIONS;
 use nmp_core::decode_snapshot_envelope;
-use nmp_ffi::{NmpApp, nmp_app_free, nmp_app_new, nmp_app_set_update_callback, nmp_app_start};
 
 use super::super::super::{
     nmp_app_chirp_close_group_discovery, nmp_app_chirp_open_group_discovery,
     nmp_app_chirp_register, nmp_app_chirp_register_dm_inbox, nmp_app_chirp_register_follow_list,
     nmp_app_chirp_register_group_events, nmp_app_chirp_unregister,
 };
-
-#[cfg(feature = "marmot")]
-use super::super::helpers::register_marmot_for_test;
 
 /// `extern "C"` callbacks cannot capture; park the frame `Sender` in a static
 /// and forward every emitted frame's bytes through it (the V-82 test pattern).
@@ -151,9 +151,6 @@ fn every_codegen_registry_key_is_registered_at_runtime() {
     .unwrap();
     nmp_app_chirp_register_group_events(app, group_request.as_ptr());
 
-    #[cfg(feature = "marmot")]
-    let marmot = register_marmot_for_test(app, "registry-coverage");
-
     // Runtime keyset: Tier-1 typed sidecar closures ∪ the Tier-2 kernel built-ins.
     // Use `registered_typed_projection_keys()` (returns registered keys WITHOUT
     // calling closures) rather than `run_typed_snapshot_projections()` (returns
@@ -171,13 +168,10 @@ fn every_codegen_registry_key_is_registered_at_runtime() {
             .map(|k| (*k).to_string()),
     );
 
-    // Feature-gated exemptions — keys whose producer is compiled out of this
-    // test build. Each entry must name the gating feature.
+    // Exempt keys whose producer is not part of the current Chirp composition.
     let mut exempt: BTreeSet<&str> = BTreeSet::new();
-    if cfg!(not(feature = "marmot")) {
-        exempt.insert("nmp.marmot.snapshot"); // feature = "marmot"
-        exempt.insert("nmp.marmot.messages"); // feature = "marmot"
-    }
+    exempt.insert("nmp.marmot.snapshot");
+    exempt.insert("nmp.marmot.messages");
     if cfg!(not(feature = "wallet")) {
         exempt.insert("wallet"); // feature = "wallet" (default-on)
     }
@@ -224,8 +218,6 @@ fn every_codegen_registry_key_is_registered_at_runtime() {
     if !discovery_handle.is_null() {
         nmp_app_chirp_close_group_discovery(discovery_handle);
     }
-    #[cfg(feature = "marmot")]
-    drop(marmot);
     nmp_app_chirp_unregister(handle);
     nmp_app_free(app);
 }

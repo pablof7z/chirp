@@ -1,21 +1,23 @@
 use std::collections::HashMap;
 use std::ffi::c_void;
-use std::sync::atomic::{AtomicI64, AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::mpsc::Receiver;
 #[cfg(test)]
 use std::sync::mpsc::RecvTimeoutError;
-use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 #[cfg(test)]
 use std::time::Duration;
 
 use jni::sys::jlong;
 
-use nmp_app_chirp::{ChirpHandle, nmp_app_chirp_unregister};
-use nmp_ffi::{NmpApp, nmp_app_free, nmp_app_set_capability_callback, nmp_app_set_update_callback};
+use nmp_app_chirp::ffi::{
+    nmp_app_free, nmp_app_set_capability_callback, nmp_app_set_update_callback, NmpApp,
+};
+use nmp_app_chirp::{nmp_app_chirp_unregister, ChirpHandle};
 
+pub(crate) use self::callback_state::CallbackState;
 use crate::capability::CapabilityHandlerSlot;
 use crate::signer_request_listener::SignerRequestListenerSlot;
-pub(crate) use self::callback_state::CallbackState;
 
 #[path = "session/callback_state.rs"]
 mod callback_state;
@@ -46,8 +48,6 @@ pub(crate) struct Session {
     #[cfg(test)]
     pub(crate) signer_request_capture: Mutex<Option<Vec<String>>>,
     pub(crate) capability_handler: CapabilityHandlerSlot,
-    #[cfg_attr(not(feature = "marmot"), allow(dead_code))]
-    pub(crate) marmot: AtomicPtr<c_void>,
     /// Lifecycle guard for lock-free callback-mutation operations (FIX 1+2).
     ///
     /// Read lock: held by lock-free quiescence/reregister/close_updates Phase 2
@@ -89,7 +89,6 @@ impl Session {
             #[cfg(test)]
             signer_request_capture: Mutex::new(None),
             capability_handler: Mutex::new(None),
-            marmot: AtomicPtr::new(std::ptr::null_mut()),
             callback_mutation_guard: RwLock::new(()),
         }
     }
@@ -120,17 +119,24 @@ impl Session {
         // Phase 1
         let app = {
             let Ok(state) = self.state.lock() else { return };
-            if state.updates_closed { return; }
+            if state.updates_closed {
+                return;
+            }
             state.app
         };
 
         // Phase 2: blocking quiescence WITHOUT `state`.
         // Read lock prevents concurrent nmp_app_free (write lock in free_native).
         if !app.is_null() {
-            let _guard = self.callback_mutation_guard.read().unwrap_or_else(|e| e.into_inner());
+            let _guard = self
+                .callback_mutation_guard
+                .read()
+                .unwrap_or_else(|e| e.into_inner());
             // Re-check: if free_native freed the app or another thread already
             // ran close_updates between Phase 1 and acquiring the read lock, skip.
-            let skip = self.state.lock()
+            let skip = self
+                .state
+                .lock()
                 .map(|s| s.updates_closed || s.freed)
                 .unwrap_or(true);
             if !skip {
@@ -143,8 +149,12 @@ impl Session {
         }
 
         // Phase 3: cleanup under `state`.
-        let Ok(mut state) = self.state.lock() else { return };
-        if state.updates_closed { return; } // idempotent
+        let Ok(mut state) = self.state.lock() else {
+            return;
+        };
+        if state.updates_closed {
+            return;
+        } // idempotent
         if !state.app.is_null() {
             self.callback_state.clear_generic_sink();
             self.clear_signer_request_listener();
@@ -166,8 +176,12 @@ impl Session {
         self.close_updates(); // idempotent; quiesces before we null state.app
 
         let (app, chirp) = {
-            let Ok(mut state) = self.state.lock() else { return };
-            if state.freed { return; }
+            let Ok(mut state) = self.state.lock() else {
+                return;
+            };
+            if state.freed {
+                return;
+            }
             state.freed = true;
             let app = state.app;
             let chirp = state.chirp;
@@ -176,7 +190,6 @@ impl Session {
             (app, chirp)
         };
 
-        crate::marmot::unregister(self);
         if !chirp.is_null() {
             nmp_app_chirp_unregister(chirp);
         }
@@ -184,8 +197,10 @@ impl Session {
             // Write lock: blocks until all in-flight read-lock holders (lock-free
             // quiescence / reregister / close_updates Phase 2) complete, then
             // the pointer is exclusively ours to free.
-            let _write_guard =
-                self.callback_mutation_guard.write().unwrap_or_else(|e| e.into_inner());
+            let _write_guard = self
+                .callback_mutation_guard
+                .write()
+                .unwrap_or_else(|e| e.into_inner());
             // SAFETY: state.freed=true, state.app=null. No thread that respects
             // those flags will access this pointer. The write lock serialises us
             // after any concurrent reader that extracted the pointer before freed
@@ -222,10 +237,15 @@ impl Session {
     /// `nmp_app_set_update_callback` call (deadlock prevention FIX 1).
     pub(crate) fn quiesce_update_callback_lockfree(&self) {
         // Read lock FIRST — prevents concurrent nmp_app_free.
-        let _guard = self.callback_mutation_guard.read().unwrap_or_else(|e| e.into_inner());
+        let _guard = self
+            .callback_mutation_guard
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
         let app = {
             let Ok(state) = self.state.lock() else { return };
-            if state.freed { return; }
+            if state.freed {
+                return;
+            }
             state.app
         };
         if !app.is_null() {
@@ -236,10 +256,15 @@ impl Session {
     /// Re-register the `on_update` C callback after a lockfree quiescence.
     /// Must NOT be called while `state.updates_closed` is true.
     pub(crate) fn reregister_update_callback_lockfree(&self) {
-        let _guard = self.callback_mutation_guard.read().unwrap_or_else(|e| e.into_inner());
+        let _guard = self
+            .callback_mutation_guard
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
         let app = {
             let Ok(state) = self.state.lock() else { return };
-            if state.updates_closed || state.freed { return; }
+            if state.updates_closed || state.freed {
+                return;
+            }
             state.app
         };
         if !app.is_null() {
@@ -268,7 +293,6 @@ impl Session {
             #[cfg(test)]
             signer_request_capture: Mutex::new(None),
             capability_handler: Mutex::new(None),
-            marmot: AtomicPtr::new(std::ptr::null_mut()),
             callback_mutation_guard: RwLock::new(()),
         })
     }
@@ -276,8 +300,12 @@ impl Session {
     /// Test-only: fire the generic sink directly, bypassing the kernel.
     #[cfg(test)]
     pub(crate) fn callback_state_send_via_generic(&self, bytes: Vec<u8>) {
-        let sink: Option<Arc<dyn Fn(Vec<u8>) + Send + Sync>> =
-            self.callback_state.generic_sink.lock().ok().and_then(|g| g.clone());
+        let sink: Option<Arc<dyn Fn(Vec<u8>) + Send + Sync>> = self
+            .callback_state
+            .generic_sink
+            .lock()
+            .ok()
+            .and_then(|g| g.clone());
         if let Some(f) = sink {
             f(bytes);
         }
@@ -311,7 +339,6 @@ impl Session {
             #[cfg(test)]
             signer_request_capture: Mutex::new(None),
             capability_handler: Mutex::new(None),
-            marmot: AtomicPtr::new(std::ptr::null_mut()),
             callback_mutation_guard: RwLock::new(()),
         })
     }

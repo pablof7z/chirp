@@ -5,7 +5,7 @@ pub(super) const CREATE_GROUP_ACTION: &str = "create-group";
 pub(super) fn start_create_group(state: &mut AppState) {
     state.start_modal(
         "Create group",
-        vec!["Protocol (nip29/mls)", "Name", "Relay(s)", "MLS invitees"],
+        vec!["Protocol (nip29)", "Name", "Relay(s)"],
         CREATE_GROUP_ACTION,
     );
 }
@@ -33,8 +33,7 @@ pub(super) fn dispatch_create_group(
 
     match protocol.as_str() {
         "" | "nip29" | "public" => create_public_group(name, &relays[0], state, runtime),
-        "mls" | "marmot" => create_mls_group(fields, name, &relays, state, runtime),
-        _ => state.push_toast("protocol must be nip29 or mls"),
+        _ => state.push_toast("protocol must be nip29"),
     }
 }
 
@@ -43,22 +42,6 @@ fn create_public_group(name: &str, relay: &str, state: &mut AppState, runtime: &
     match runtime.create_public_group(relay, &local_id, name, None) {
         Ok(cid) => state.track_action(cid, &format!("group create {local_id}")),
         Err(e) => state.push_toast(&format!("group create failed: {e}")),
-    }
-}
-
-fn create_mls_group(
-    fields: &[(String, String)],
-    name: &str,
-    relays: &[String],
-    state: &mut AppState,
-    runtime: &AppRuntime,
-) {
-    let invitee_text = field(fields, 3)
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
-    match runtime.marmot_create_group(name, relays, invitee_text) {
-        Ok(result) => state.status = format!("mls {}", truncate(&result)),
-        Err(e) => state.push_toast(&format!("mls create failed: {e}")),
     }
 }
 
@@ -105,15 +88,6 @@ fn slug_title(name: &str) -> String {
         "group".to_string()
     } else {
         slug
-    }
-}
-
-fn truncate(value: &str) -> String {
-    let compact = value.replace('\n', " ");
-    if compact.chars().count() <= 120 {
-        compact
-    } else {
-        format!("{}...", compact.chars().take(117).collect::<String>())
     }
 }
 

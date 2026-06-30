@@ -13,7 +13,7 @@
 use std::ffi::{c_void, CStr, CString};
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use nmp_ffi::{
+use super::super::{
     nmp_app_free, nmp_app_load_older_feed, nmp_app_new, nmp_app_set_update_callback, nmp_app_start,
     nmp_free_string, NmpApp,
 };

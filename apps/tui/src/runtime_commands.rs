@@ -2,20 +2,18 @@ use std::ffi::{c_void, CStr, CString};
 use std::ptr;
 
 use nmp_app_chirp::ffi::{
+    nmp_app_cancel_action, nmp_app_remove_relay, nmp_app_retry_publish, nmp_app_signin_nsec,
+    nmp_free_string,
+};
+use nmp_app_chirp::ffi::{
     nmp_app_chirp_register_dm_inbox, nmp_app_chirp_register_follow_list,
     nmp_app_chirp_register_group_events,
 };
 use nmp_app_chirp::{
-    nmp_app_cancel_bunker_handshake, nmp_app_chirp_create_new_account,
-    nmp_app_chirp_identity_sign_in_nsec, nmp_app_chirp_open_tag_feed, nmp_app_nostrconnect_uri,
-    nmp_marmot_register_active, nmp_marmot_unregister, send_dm_spec, zap_identifier_spec, zap_spec,
+    nmp_app_cancel_bunker_handshake, nmp_app_chirp_create_new_account, nmp_app_chirp_open_tag_feed,
+    nmp_app_nostrconnect_uri, send_dm_spec, zap_identifier_spec, zap_spec,
 };
 use nmp_app_chirp::{nmp_app_chirp_close_group_discovery, nmp_app_chirp_open_group_discovery};
-use nmp_chirp_config::CHIRP_MARMOT_KEYRING_SERVICE_ID;
-use nmp_ffi::{
-    nmp_app_cancel_action, nmp_app_remove_relay, nmp_app_retry_publish, nmp_app_signin_nsec,
-    nmp_free_string,
-};
 use serde_json::{json, Value};
 
 use crate::runtime::AppRuntime;
@@ -31,26 +29,10 @@ unsafe extern "C" {
 
 impl AppRuntime {
     pub fn sign_in_nsec(&self, nsec: &str) -> Result<()> {
-        self.unregister_marmot();
         self.with_cstr(nsec, |c| nmp_app_signin_nsec(self.app_ptr(), c.as_ptr(), 1))
     }
 
-    pub fn sign_in_nsec_with_marmot(&self, nsec: &str) -> Result<()> {
-        self.unregister_marmot();
-        let secret = CString::new(nsec).map_err(|_| "secret contains NUL byte".to_string())?;
-        let dir = CString::new(marmot_db_dir())
-            .map_err(|_| "marmot DB path contains NUL byte".to_string())?;
-        let handle =
-            nmp_app_chirp_identity_sign_in_nsec(self.app_ptr(), secret.as_ptr(), dir.as_ptr());
-        if handle.is_null() {
-            return Err("marmot sign-in returned null".to_string());
-        }
-        self.marmot.set(handle);
-        Ok(())
-    }
-
     pub fn sign_in_bunker(&self, uri: &str) -> Result<()> {
-        self.unregister_marmot();
         self.with_cstr(uri, |c| unsafe {
             nmp_app_signin_bunker(self.app_ptr().cast(), c.as_ptr(), 1)
         })
@@ -68,7 +50,6 @@ impl AppRuntime {
     }
 
     pub fn create_account(&self, name: &str, relays: &[String], mls: bool) -> Result<()> {
-        self.unregister_marmot();
         let profile = CString::new(json!({ "name": name }).to_string())
             .map_err(|_| "profile JSON contains NUL byte".to_string())?;
         let relays_json: Vec<Value> = relays
@@ -84,14 +65,12 @@ impl AppRuntime {
     }
 
     pub fn switch_account(&self, identity_id: &str) -> Result<()> {
-        self.unregister_marmot();
         self.with_cstr(identity_id, |c| unsafe {
             nmp_app_switch_active(self.app_ptr().cast(), c.as_ptr())
         })
     }
 
     pub fn remove_account(&self, identity_id: &str) -> Result<()> {
-        self.unregister_marmot();
         self.with_cstr(identity_id, |c| unsafe {
             nmp_app_remove_account(self.app_ptr().cast(), c.as_ptr())
         })
@@ -291,107 +270,21 @@ impl AppRuntime {
         author_pubkey: Option<&str>,
         reaction: &str,
     ) -> Result<String> {
-        let mut body = json!({
-            "group": { "host_relay_url": relay, "local_id": local_id },
-            "target_event_id": event_id,
-            "content": reaction,
-        });
-        if let Some(author) = author_pubkey {
-            body["target_author_pubkey"] = Value::String(author.to_string());
-        }
-        self.dispatch_action_value("nmp.nip29.react_in_group", &body)
+        let reaction_event = nmp_nip25::build_reaction_event(&nmp_nip25::ReactAction {
+            target_event_id: event_id.to_string(),
+            reaction: reaction.to_string(),
+            target_author_pubkey: author_pubkey.map(str::to_string),
+        })?;
+        self.dispatch_action_value(
+            "nmp.nip29.publish_group_event",
+            &json!({
+                "group": { "host_relay_url": relay, "local_id": local_id },
+                "kind": reaction_event.kind,
+                "content": reaction_event.content,
+                "tags": reaction_event.tags,
+            }),
+        )
     }
-
-    pub fn marmot_register_active(&self) -> Result<()> {
-        if !self.marmot.get().is_null() {
-            return Ok(());
-        }
-        let dir = CString::new(marmot_db_dir())
-            .map_err(|_| "marmot DB path contains NUL byte".to_string())?;
-        let svc = CString::new(CHIRP_MARMOT_KEYRING_SERVICE_ID)
-            .map_err(|_| "marmot service id contains NUL byte".to_string())?;
-        let handle = nmp_marmot_register_active(self.app_ptr(), dir.as_ptr(), svc.as_ptr());
-        if handle.is_null() {
-            return Err("no active Marmot identity".to_string());
-        }
-        self.marmot.set(handle);
-        Ok(())
-    }
-
-    pub fn marmot_dispatch_json(&self, action: Value) -> Result<String> {
-        self.marmot_register_active()?;
-        // ADR-0025 PR 3 (2026-05-23): the legacy bespoke `nmp_marmot_dispatch`
-        // C-ABI symbol was deleted. iOS routes Marmot ops through
-        // `nmp_app_dispatch_action("nmp.marmot", …)`, but that path returns
-        // only `{"correlation_id":"…"}` — the rich per-op envelope the TUI
-        // surfaces to the operator (`ok`, per-op detail) is dropped. The
-        // Rust-native `MarmotHandle::dispatch` accessor reaches the SAME
-        // `ops::dispatch` entry point both seams use, without any C-ABI in
-        // the loop. See `crates/chirp-repl/src/app.rs::marmot_dispatch` for
-        // the parallel migration.
-        //
-        // SAFETY: `marmot_register_active` guarantees `self.marmot.get()` is
-        // non-null (it returns `Err` otherwise); the handle was boxed by
-        // `nmp_marmot_register*` and remains valid until `unregister_marmot`.
-        // The TUI runs each command from the single async runtime task that
-        // owns `AppRuntime`, so no other thread mutates the pointer.
-        let handle_ptr = self.marmot.get();
-        let handle = unsafe { &*handle_ptr };
-        let value = handle.dispatch(&action);
-        Ok(value.to_string())
-    }
-
-    pub fn marmot_create_group(
-        &self,
-        name: &str,
-        relays: &[String],
-        invitee_text: Option<&str>,
-    ) -> Result<String> {
-        let mut body = json!({
-            "op": "create_group",
-            "name": name,
-            "relays": relays,
-        });
-        if let Some(invitees) = invitee_text
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            body["invitee_text"] = Value::String(invitees.to_string());
-        }
-        self.marmot_dispatch_json(body)
-    }
-
-    pub fn marmot_snapshot_text(&self) -> Result<String> {
-        self.marmot_register_active()?;
-        // V-107 / ADR-0039: use the Rust-native accessor on the MarmotHandle
-        // instead of the deprecated C-ABI pull symbol `nmp_marmot_snapshot`.
-        // Same data path as the push projection `"nmp.marmot.snapshot"` on the
-        // SnapshotFrame.
-        //
-        // SAFETY: `self.marmot.get()` is non-null (guaranteed by
-        // `marmot_register_active()` returning Ok above).
-        let handle = unsafe { &*self.marmot.get() };
-        serde_json::to_string(&handle.snapshot_rust())
-            .map_err(|e| format!("marmot snapshot serialize: {e}"))
-    }
-
-    fn unregister_marmot(&self) {
-        if !self.marmot.get().is_null() {
-            nmp_marmot_unregister(self.marmot.get());
-            self.marmot.set(ptr::null_mut());
-        }
-    }
-}
-
-fn marmot_db_dir() -> String {
-    crate::keyring::chirp_data_dir()
-        .map(|p| p.join("marmot"))
-        .and_then(|p| std::fs::create_dir_all(&p).ok().map(|_| p))
-        .unwrap_or_else(|| {
-            std::env::temp_dir().join(format!("chirp-tui-marmot-{}", std::process::id()))
-        })
-        .to_string_lossy()
-        .into_owned()
 }
 
 fn take_broker_string(ptr: *mut std::ffi::c_char, label: &str) -> Result<String> {

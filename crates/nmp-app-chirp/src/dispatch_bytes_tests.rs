@@ -76,7 +76,7 @@ fn every_dispatched_namespace_encodes_to_typed_payload() {
         ),
         (
             "nmp.nip01.visible_note_relations",
-            r#"{"op":"claim","event_id":"abc","consumer_id":"row-0"}"#,
+            r#"{"lifecycle":"claim","target_event_id":"abababababababababababababababababababababababababababababababab","target_kind":1,"consumer_id":"row-0"}"#,
         ),
         (
             "nmp.nip29.discover",
@@ -93,10 +93,6 @@ fn every_dispatched_namespace_encodes_to_typed_payload() {
         (
             "nmp.nip29.publish_group_event",
             r#"{"group":{"host_relay_url":"wss://groups.example","local_id":"g1"},"kind":9,"content":"hi"}"#,
-        ),
-        (
-            "nmp.nip29.react_in_group",
-            r#"{"group":{"host_relay_url":"wss://groups.example","local_id":"g1"},"target_event_id":"abc","content":"+"}"#,
         ),
     ];
 

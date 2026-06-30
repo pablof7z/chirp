@@ -42,13 +42,7 @@ fn modal_form_renders_as_centered_overlay() {
     let mut state = state_with_account();
     state.start_modal(
         "Create group",
-        vec![
-            "Protocol (nip29/mls)",
-            "Name",
-            "Relay(s)",
-            "NIP-29 local id",
-            "MLS invitees",
-        ],
+        vec!["Protocol (nip29)", "Name", "Relay(s)", "NIP-29 local id"],
         "create-group",
     );
 
@@ -56,7 +50,6 @@ fn modal_form_renders_as_centered_overlay() {
 
     assert!(rendered.contains("Create group"));
     assert!(rendered.contains("Protocol"));
-    assert!(rendered.contains("MLS invitees"));
     assert!(rendered.contains("Shift+Tab"));
 }
 

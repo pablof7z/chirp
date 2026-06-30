@@ -18,7 +18,10 @@ impl AppRuntime {
     /// auto-follows Chirp's seed set — injected in Rust from `nmp-chirp-config`
     /// (#1493). The seed pubkeys never transit this shell.
     pub fn create_account(&self, profile: HashMap<String, String>, relays: Vec<(String, String)>) {
-        let relays_json = json!(relays.iter().map(|(u, r)| json!([u, r])).collect::<Vec<_>>());
+        let relays_json = json!(relays
+            .iter()
+            .map(|(u, r)| json!([u, r]))
+            .collect::<Vec<_>>());
         let (Some(profile_c), Ok(relays_c)) = (
             serde_json::to_string(&profile)
                 .ok()

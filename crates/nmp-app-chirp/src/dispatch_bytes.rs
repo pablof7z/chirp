@@ -3,7 +3,7 @@
 //!
 //! The JSON doorway `nmp_app_dispatch_action(app, namespace, json)` is retired
 //! from these crates. Every write the Chirp Rust path emits now travels the
-//! typed [`nmp_ffi::nmp_app_dispatch_action_bytes`] doorway: a host-minted
+//! typed [`nmp_native_runtime::dispatch_action_bytes_typed`] doorway: a host-minted
 //! `correlation_id` + the module's host NAMESPACE + a per-crate typed
 //! [`ActionPayload`](nmp_core::substrate::ActionPayload) payload, wrapped in an
 //! open [`DispatchEnvelope`](nmp_core::dispatch_envelope) via
@@ -28,7 +28,6 @@
 //! namespace with no typed encoder is rejected fail-closed (D6) rather than
 //! silently falling back to a JSON dispatch — there is no JSON dispatch left.
 
-use std::ffi::CStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::de::DeserializeOwned;
@@ -36,7 +35,7 @@ use serde_json::Value;
 
 use nmp_core::dispatch_envelope::{encode_dispatch_envelope, DISPATCH_ENVELOPE_SCHEMA_VERSION};
 use nmp_core::substrate::ActionPayload;
-use nmp_ffi::{nmp_app_dispatch_action_bytes, nmp_free_string, NmpApp};
+use nmp_native_runtime::{dispatch_action_bytes_typed, NmpApp};
 
 /// Process-local correlation-id source.
 ///
@@ -95,19 +94,12 @@ fn encode_payload_for_namespace(namespace: &str, json: &str) -> Result<Vec<u8>, 
         "nmp.nip29.publish_group_event" => {
             encode::<nmp_nip29::action::PublishGroupEventInput>(namespace, json)
         }
-        "nmp.nip29.react_in_group" => {
-            encode::<nmp_nip29::action::ReactInGroupInput>(namespace, json)
-        }
         #[cfg(feature = "wallet")]
         "nmp.wallet.connect" => encode::<nmp_nip47::WalletConnectAction>(namespace, json),
         #[cfg(feature = "wallet")]
         "nmp.wallet.disconnect" => encode::<nmp_nip47::WalletDisconnectAction>(namespace, json),
         #[cfg(feature = "wallet")]
         "nmp.wallet.pay_invoice" => encode::<nmp_nip47::WalletAction>(namespace, json),
-        #[cfg(feature = "marmot")]
-        "nmp.marmot" => {
-            encode::<nmp_marmot::projection::action::MarmotAction>(namespace, json)
-        }
         other => Err(format!(
             "no typed payload encoder for action namespace '{other}' (byte doorway has no JSON fallback)"
         )),
@@ -154,21 +146,15 @@ pub fn dispatch_action_bytes_for(
         &payload,
     );
 
-    // SAFETY: `app` is a valid, non-null pointer (checked above); `envelope` is a
-    // live, fully-initialised byte buffer for the duration of the call. The
-    // doorway reads the bytes but never retains or frees them.
-    let ptr = nmp_app_dispatch_action_bytes(app, envelope.as_ptr(), envelope.len());
-    if ptr.is_null() {
-        return Err("action dispatch returned null".to_string());
+    // SAFETY: `app` is a valid, non-null pointer checked above.
+    let outcome = dispatch_action_bytes_typed(unsafe { &*app }, &envelope);
+    if let Some(error) = outcome.error {
+        return Err(error);
     }
-    let text = unsafe { CStr::from_ptr(ptr) }
-        .to_string_lossy()
-        .into_owned();
-    nmp_free_string(ptr);
-
-    let value: Value = serde_json::from_str(&text)
-        .map_err(|e| format!("action dispatch returned invalid JSON: {e}"))?;
-    parse_dispatch_envelope(&value)
+    outcome
+        .correlation_id
+        .filter(|id| !id.is_empty())
+        .ok_or_else(|| "action dispatch envelope missing correlation_id".to_string())
 }
 
 /// Parse a dispatch result envelope returned by the byte doorway.

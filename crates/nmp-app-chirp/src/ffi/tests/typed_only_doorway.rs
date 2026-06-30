@@ -10,21 +10,17 @@
 //! no-`decode_payload` module is rejected `NotTypedCapable` and so is
 //! unreachable through the byte doorway.
 //!
-//! The sibling gate in `nmp-defaults`
-//! (`tests/typed_only_action_doorway_gate.rs`) only walks
-//! `nmp_defaults::register_defaults` — the canonical NMP default set. That is a
-//! STRICT SUBSET of what the production Chirp app wires: Chirp also registers
-//! NIP-29 group actions, the cross-protocol visible-note-relations action, the
-//! NIP-47 wallet stack, and (under the `marmot` feature) the Marmot MLS seam.
-//! Asserting "all typed" over `register_defaults` alone therefore reported a
-//! FALSE GREEN while the full Chirp composition still carried JSON-only modules.
+//! The reusable NMP owner-crate composition is a STRICT SUBSET of what the
+//! production Chirp app wires: Chirp also registers NIP-29 group actions, the
+//! cross-protocol visible-note-relations action, the NIP-47 wallet stack, and
+//! the app-specific Chirp actions. Asserting "all typed" over shared NMP
+//! composition alone would report a FALSE GREEN while the full Chirp
+//! composition still carried JSON-only modules.
 //!
 //! This gate spins up a REAL [`NmpApp`] and runs the actual production
 //! composition root — `nmp_app_chirp_register` (the exact C-ABI entry point the
-//! iOS shell links against) plus the Marmot `ActionModule` registration the
-//! `marmot`-featured iOS build performs at sign-in — then asserts the untyped
-//! set equals a frozen RATCHET allowlist of genuinely-remaining JSON-only
-//! producers.
+//! iOS shell links against) — then asserts the untyped set equals a frozen
+//! RATCHET allowlist of genuinely-remaining JSON-only producers.
 //!
 //! # Migration ratchet (ADR-0064 is per-crate, in-flight)
 //!
@@ -44,14 +40,11 @@
 //!   completes; at Cut B the JSON doorway and this allowlist both reach zero —
 //!   that is Cut B *across the full composition*, not merely the default set).
 
-use nmp_ffi::{NmpApp, nmp_app_free, nmp_app_new};
+use super::super::{nmp_app_free, nmp_app_new, NmpApp};
 
 use super::super::{
-    ChirpHandle, NmpRegisterStatus, nmp_app_chirp_register, nmp_app_chirp_unregister,
+    nmp_app_chirp_register, nmp_app_chirp_unregister, ChirpHandle, NmpRegisterStatus,
 };
-
-#[cfg(feature = "marmot")]
-use super::helpers::{MarmotTestRegistration, register_marmot_for_test};
 
 /// Production Chirp modules NOT yet migrated to a typed FlatBuffers payload —
 /// they ride the JSON doorway (`nmp_app_dispatch_action`) only and are rejected
@@ -62,11 +55,6 @@ use super::helpers::{MarmotTestRegistration, register_marmot_for_test};
 /// Each entry documents the owning crate + the reason it is still JSON-only.
 /// Cut B for the full composition = this list reaches empty.
 ///
-/// NOTE on `marmot`: `nmp.marmot` is produced by the `nmp-marmot` crate and is
-/// only registered when the `marmot` cargo feature is on (the iOS shell builds
-/// with `--features marmot`; the default test/CI build does NOT). The allowlist
-/// below is feature-gated to match the composition actually built, so the gate
-/// stays exact in both configurations.
 /// All previously-pending modules have been migrated to typed FlatBuffers
 /// payloads on origin/master:
 ///  - `nmp.nip01.visible_note_relations`: `decode_payload` added in #1838
@@ -74,21 +62,16 @@ use super::helpers::{MarmotTestRegistration, register_marmot_for_test};
 ///  - `nmp.nip29.discover`: `decode_payload` added in #1838
 ///    (`crates/nmp-nip29/src/action/discover.rs:54`).
 /// The default-feature untyped set is now empty. Cut B for the full
-/// composition (excluding the `marmot` feature) is REACHED.
+/// composition is REACHED.
 const MIGRATION_PENDING_UNTYPED: &[&str] = &[];
 
 struct FullChirpComposition {
     app: *mut NmpApp,
     handle: *mut ChirpHandle,
-    #[cfg(feature = "marmot")]
-    marmot: Option<MarmotTestRegistration>,
 }
 
 impl Drop for FullChirpComposition {
     fn drop(&mut self) {
-        #[cfg(feature = "marmot")]
-        drop(self.marmot.take());
-
         if !self.handle.is_null() {
             nmp_app_chirp_unregister(self.handle);
             self.handle = std::ptr::null_mut();
@@ -101,10 +84,9 @@ impl Drop for FullChirpComposition {
 }
 
 /// Build the EXACT production Chirp composition on a fresh real [`NmpApp`]:
-/// `nmp_app_chirp_register` (= `register_defaults` + NIP-29 actions +
-/// visible-note-relations + NIP-47 wallet + zaps/group/op-feed projections),
-/// and, under `--features marmot`, the `MarmotActionModule` the iOS shell
-/// registers at sign-in. Returns the live `(app, handle)`; the caller must
+/// `nmp_app_chirp_register` (= explicit NMP owner-crate composition + NIP-29
+/// actions + visible-note-relations + NIP-47 wallet + zaps/group/op-feed
+/// projections). Returns the live `(app, handle)`; the caller must
 /// `nmp_app_chirp_unregister(handle)` then `nmp_app_free(app)`.
 fn build_full_chirp_composition() -> FullChirpComposition {
     let app = nmp_app_new();
@@ -121,33 +103,13 @@ fn build_full_chirp_composition() -> FullChirpComposition {
     );
     assert!(!handle.is_null(), "register returned null handle on Ok");
 
-    let mut composition = FullChirpComposition {
-        app,
-        handle,
-        #[cfg(feature = "marmot")]
-        marmot: None,
-    };
-
-    // Under `--features marmot` the iOS shell additionally registers the
-    // `MarmotActionModule` against the kernel action registry at sign-in
-    // (`nmp_marmot::ffi::register_with_secret_hex` →
-    // `register_action(MarmotActionModule::new(projection))`).
-    // This gate does not drive a Marmot operation; it only needs the same
-    // action module the production registration path installs. Use the
-    // production Rust helper so the module construction stays in `nmp-marmot`
-    // and Chirp does not regain direct MDK/test-storage dependencies.
-    #[cfg(feature = "marmot")]
-    {
-        composition.marmot = Some(register_marmot_for_test(app, "typed-only"));
-    }
+    let mut composition = FullChirpComposition { app, handle };
 
     composition
 }
 
 /// Sorted expected untyped set for the composition actually built.
-/// After M14-1c (#2169), `nmp.marmot` is now TYPED (`MarmotActionModule`
-/// overrides `decode_payload`) so it is no longer in the untyped allowlist.
-/// The full composition (including `--features marmot`) has zero untyped modules.
+/// The full Chirp composition has zero untyped modules.
 fn expected_untyped() -> Vec<String> {
     MIGRATION_PENDING_UNTYPED
         .iter()

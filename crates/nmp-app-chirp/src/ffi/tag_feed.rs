@@ -55,7 +55,7 @@ use nmp_feed::{
     FeedAdmission, FeedHandle, FeedParams, FeedRanking, FeedScope, FeedWindow, ProjectionKey,
     TagTerm, DEFAULT_FEED_WINDOW_LIMIT,
 };
-use nmp_ffi::{FeedOpenError, NmpApp};
+use nmp_native_runtime::{FeedOpenError, NmpApp};
 
 use super::helpers::c_string_opt;
 
@@ -265,10 +265,10 @@ mod tests {
         );
         // The declared primaries pass fail-closed validation and compile to the
         // SAME acquisition kind set the raw path opened (1 ∪ derived wrappers ∪ 5).
-        // Validation lives in the composition layer (`nmp_ffi`), not in the
+        // Validation lives in the composition layer (`nmp-native-runtime`), not in the
         // protocol-agnostic `nmp-feed` engine.
-        let kinds =
-            nmp_ffi::validate_feed_params(&params).expect("primary [1] is a valid declaration");
+        let kinds = nmp_native_runtime::validate_feed_params(&params)
+            .expect("primary [1] is a valid declaration");
         assert!(kinds.contains(&1), "primary kind:1 acquired");
         assert!(
             kinds.contains(&6),

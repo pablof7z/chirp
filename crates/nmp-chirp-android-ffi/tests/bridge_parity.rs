@@ -1,12 +1,13 @@
 use std::ffi::c_char;
 
 const KOTLIN_BRIDGE: &str =
-    include_str!("../../../../../apps/chirp/android/app/src/main/java/org/nmp/android/KernelBridge.kt");
+    include_str!("../../../apps/android/app/src/main/java/org/nmp/android/KernelBridge.kt");
 const LIB_RS: &str = include_str!("../src/lib.rs");
 const ACTION_RS: &str = include_str!("../src/action.rs");
 const PLATFORM_RS: &str = include_str!("../src/platform.rs");
 const SIGNER_RS: &str = include_str!("../src/signer.rs");
 const EXTERNAL_SIGNER_RS: &str = include_str!("../src/external_signer.rs");
+const IDENTITY_RS: &str = include_str!("../src/identity.rs");
 // The NIP-55 signer-request push-listener JNI symbols
 // (`nativeSetSignerRequestListener`/`nativeClearSignerRequestListener`) live in
 // this module, not `lib.rs`, so the parity grep must include it.
@@ -21,6 +22,7 @@ fn android_bridge_declares_parity_jni_symbols() {
         PLATFORM_RS,
         SIGNER_RS,
         EXTERNAL_SIGNER_RS,
+        IDENTITY_RS,
         SIGNER_REQUEST_LISTENER_RS,
     ]
     .join("\n");
@@ -75,6 +77,7 @@ fn app_loop_jni_symbols_are_deleted() {
         PLATFORM_RS,
         SIGNER_RS,
         EXTERNAL_SIGNER_RS,
+        IDENTITY_RS,
         SIGNER_REQUEST_LISTENER_RS,
     ]
     .join("\n");
@@ -92,6 +95,10 @@ fn app_loop_jni_symbols_are_deleted() {
         // nativeDispatchIntentBytes / nativeDispatchActionBytes
         "Java_org_nmp_android_KernelBridge_nativeDispatchIntentBytes",
         "Java_org_nmp_android_KernelBridge_nativeDispatchActionBytes",
+        // Deleted no-op compatibility stubs.
+        "Java_org_nmp_android_KernelBridge_nativeIdentityRestore",
+        "Java_org_nmp_android_KernelBridge_nativeMarmotRegisterActive",
+        "Java_org_nmp_android_KernelBridge_nativeMarmotUnregister",
     ] {
         assert!(
             !all_rust_sources.contains(deleted_symbol),
@@ -111,6 +118,9 @@ fn app_loop_jni_symbols_are_deleted() {
         "external fun nativeClearUpdateListener(",
         "external fun nativeDispatchIntentBytes(",
         "external fun nativeDispatchActionBytes(",
+        "external fun nativeIdentityRestore(",
+        "external fun nativeMarmotRegisterActive(",
+        "external fun nativeMarmotUnregister(",
     ] {
         assert!(
             !KOTLIN_BRIDGE.contains(deleted_kotlin),
@@ -122,24 +132,32 @@ fn app_loop_jni_symbols_are_deleted() {
 
 #[test]
 fn rust_path_reexports_cover_android_parity_surface() {
-    let _ =
-        nmp_ffi::nmp_app_set_storage_path as extern "C" fn(*mut nmp_ffi::NmpApp, *const c_char) -> u32;
-    let _ = nmp_ffi::nmp_app_lifecycle_foreground as extern "C" fn(*mut nmp_ffi::NmpApp);
-    let _ = nmp_ffi::nmp_app_lifecycle_background as extern "C" fn(*mut nmp_ffi::NmpApp);
-    let _ = nmp_ffi::nmp_app_is_alive as extern "C" fn(*mut nmp_ffi::NmpApp) -> u8;
-    let _ = nmp_ffi::nmp_app_ack_action_stage as extern "C" fn(*mut nmp_ffi::NmpApp, *const c_char);
-    let _ = nmp_ffi::nmp_app_load_older_feed as extern "C" fn(*mut nmp_ffi::NmpApp, *const c_char);
-    let _ =
-        nmp_ffi::nmp_app_signin_bunker as extern "C" fn(*mut nmp_ffi::NmpApp, *const c_char, u8);
-    let _ = nmp_app_chirp::nmp_signer_broker_init as extern "C" fn(*mut nmp_ffi::NmpApp) -> u32;
-    let _ = nmp_app_chirp::nmp_app_cancel_bunker_handshake as extern "C" fn(*mut nmp_ffi::NmpApp);
+    let _ = nmp_app_chirp::ffi::nmp_app_set_storage_path
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp, *const c_char) -> u32;
+    let _ = nmp_app_chirp::ffi::nmp_app_lifecycle_foreground
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp);
+    let _ = nmp_app_chirp::ffi::nmp_app_lifecycle_background
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp);
+    let _ = nmp_app_chirp::ffi::nmp_app_is_alive
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp) -> u8;
+    let _ = nmp_app_chirp::ffi::nmp_app_ack_action_stage
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp, *const c_char);
+    let _ = nmp_app_chirp::ffi::nmp_app_load_older_feed
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp, *const c_char);
+    let _ = nmp_app_chirp::ffi::nmp_app_signin_bunker
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp, *const c_char, u8);
+    let _ = nmp_app_chirp::nmp_signer_broker_init
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp) -> u32;
+    let _ = nmp_app_chirp::nmp_app_cancel_bunker_handshake
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp);
     let _ = nmp_app_chirp::nmp_app_nostrconnect_uri
-        as extern "C" fn(*mut nmp_ffi::NmpApp, *const c_char) -> *mut c_char;
-    let _ = nmp_ffi::nmp_free_string as extern "C" fn(*mut c_char);
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp, *const c_char) -> *mut c_char;
+    let _ = nmp_app_chirp::ffi::nmp_free_string as extern "C" fn(*mut c_char);
     // ADR-0048 Stage 2 — NIP-55 external-signer driver surface.
-    let _ = nmp_ffi::nmp_external_signer_init as extern "C" fn(*mut nmp_ffi::NmpApp);
-    let _ =
-        nmp_ffi::nmp_app_signin_nip55 as extern "C" fn(*mut nmp_ffi::NmpApp, *const c_char);
-    let _ = nmp_ffi::nmp_app_deliver_external_signer_response
-        as extern "C" fn(*mut nmp_ffi::NmpApp, *const c_char);
+    let _ = nmp_app_chirp::ffi::nmp_external_signer_init
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp);
+    let _ = nmp_app_chirp::ffi::nmp_app_signin_nip55
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp, *const c_char);
+    let _ = nmp_app_chirp::ffi::nmp_app_deliver_external_signer_response
+        as extern "C" fn(*mut nmp_app_chirp::ffi::NmpApp, *const c_char);
 }
