@@ -18,7 +18,7 @@
 //! `nip46_onboarding`, `signer_state`) are NOT affected: they self-gate by
 //! registration (registration IS the declaration).
 
-use nmp_ffi::NmpApp;
+use nmp_native_runtime::NmpApp;
 
 /// ADR-0053 / Workstream-E4 — declare Chirp's projection-consumption intent on
 /// `app`: the explicit "consume every Tier-2 built-in" (`consume_all`). Chirp's
@@ -32,8 +32,9 @@ use nmp_ffi::NmpApp;
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn nmp_app_chirp_declare_consumed_projections(app: *mut NmpApp) {
-    // Chirp is a full client — it reads every kernel built-in. Reuse the generic
-    // FFI seam so a single code path expresses "everything" (no Chirp-local key
-    // list to drift from the kernel built-in set).
-    nmp_ffi::nmp_app_consume_all_builtin_projections(app);
+    if app.is_null() {
+        return;
+    }
+    // SAFETY: caller guarantees `app` is a valid pointer from `nmp_app_new`.
+    unsafe { &*app }.consume_all_builtin_projections();
 }

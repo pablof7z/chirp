@@ -10,7 +10,7 @@
 
 use std::sync::Arc;
 
-use nmp_ffi::NmpApp;
+use nmp_native_runtime::NmpApp;
 
 /// Register the NIP-47 wallet stack on `app`. Called by
 /// `nmp_app_chirp_register` when the `wallet` feature is on.
@@ -23,10 +23,9 @@ use nmp_ffi::NmpApp;
 /// ADR-0052 rung 5.2: `register_wallet` returns the per-app
 /// `WalletRuntimeHandle`; we wrap it in a NIP-47-backed `PaymentPort` and inject
 /// it into the NIP-57 zap auto-chain via `register_zap_with_payment_port` (the
-/// ADR-0049 app-path override of the port-less zap default
-/// `nmp_defaults::register_defaults` installed) so a zap pays through THIS app's
-/// wallet. NIP-57 depends only on the substrate `PaymentPort`, not NIP-47
-/// (#1728).
+/// ADR-0049 app-path override of the port-less zap path) so a zap pays through
+/// THIS app's wallet. NIP-57 depends only on the substrate `PaymentPort`, not
+/// NIP-47 (#1728).
 pub(crate) fn register_nip47_wallet(app: &mut NmpApp) {
     let storage_path = app.storage_path_for_start();
     let wallet_runtime = nmp_nip47::register_wallet(app, storage_path);

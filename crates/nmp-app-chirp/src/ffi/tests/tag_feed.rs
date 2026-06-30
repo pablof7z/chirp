@@ -23,10 +23,7 @@ use std::ffi::{c_void, CString};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
-use nmp_ffi::{
-    nmp_app_free, nmp_app_inject_signed_event_json, nmp_app_new, nmp_app_set_update_callback,
-    nmp_app_start, NmpApp,
-};
+use super::super::{nmp_app_free, nmp_app_new, nmp_app_set_update_callback, nmp_app_start, NmpApp};
 use nostr::prelude::JsonUtil;
 use nostr::{EventBuilder, Keys, Tag, Timestamp};
 
@@ -53,9 +50,9 @@ fn start_app() -> (*mut NmpApp, Receiver<()>, Box<Sender<()>>) {
 
 fn inject_and_wait(app: *mut NmpApp, json: &str, id: &str, rx: &Receiver<()>) {
     let json_c = CString::new(json).expect("event JSON");
-    let ok = nmp_app_inject_signed_event_json(app, json_c.as_ptr());
-    assert!(ok, "inject must succeed for: {json}");
     let app_ref: &NmpApp = unsafe { &*app };
+    let ok = app_ref.inject_signed_event_json_for_test(json);
+    assert!(ok, "inject must succeed for: {json}");
     if app_ref.event_by_id(id).is_some() {
         return;
     }

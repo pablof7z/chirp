@@ -31,7 +31,7 @@ class KeystoreKeyringPostureTest {
 
     private val repoRoot: File by lazy {
         var dir = File(System.getProperty("user.dir")!!).absoluteFile
-        while (!File(dir, "Cargo.lock").isFile || !File(dir, "crates/nmp-ffi").isDirectory) {
+        while (!File(dir, "Cargo.lock").isFile || !File(dir, "crates/nmp-app-chirp").isDirectory) {
             dir = dir.parentFile
                 ?: error("repo root not found above ${System.getProperty("user.dir")}")
         }
@@ -46,7 +46,7 @@ class KeystoreKeyringPostureTest {
     private val source: String by lazy {
         val f = File(
             repoRoot,
-            "apps/chirp/android/app/src/main/java/org/nmp/android/KeystoreKeyringCapability.kt",
+            "apps/android/app/src/main/java/org/nmp/android/KeystoreKeyringCapability.kt",
         )
         assertTrue("missing KeystoreKeyringCapability.kt", f.exists())
         f.readLines()

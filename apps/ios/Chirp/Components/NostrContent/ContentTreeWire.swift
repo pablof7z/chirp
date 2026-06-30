@@ -78,7 +78,7 @@ public enum NostrWireInvoice: Decodable, Equatable, Sendable {
     }
 }
 
-/// Flattened, Codable projection of `nmp_core::nip21::NostrUri`. `uri` is the
+/// Flattened, Codable projection of `nmp_nostr_id::NostrUri`. `uri` is the
 /// round-trippable canonical `nostr:` URI; `primaryId` is the hex pubkey for
 /// profiles, event id for events, or author pubkey for addresses.
 public struct NostrWireUri: Decodable, Equatable, Sendable {

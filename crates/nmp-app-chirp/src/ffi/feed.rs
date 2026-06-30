@@ -8,22 +8,21 @@
 //! session; the raw active-follows declaration / contact-feed C symbols are
 //! retired.
 //!
-//! ## Why this lives in the app-composition crate, not `nmp-ffi`
+//! ## Why this lives in the app-composition crate
 //!
-//! [`nmp_ffi::NmpApp::open_feed`] takes a `compiler` — the scope→registration
+//! [`NmpApp::open_feed`] takes a `compiler` — the scope→registration
 //! step that names the OP-feed engine / follow set / typed sidecar. That wiring
-//! lives in [`nmp_native_runtime::compile_feed_params`], ABOVE `nmp-ffi` in the DAG,
-//! so `nmp-ffi` stays D0-clean (it matches on no `FeedScope` variant). The
-//! generic C-ABI doorway therefore lives HERE — the composition layer that can
-//! name both `NmpApp` and the compiler — and hands the same single canonical
-//! compiler to `open_feed` for every scope. The per-app primary-kind decision
-//! is the app's (it builds the `FeedParams`); wrapper/delete derivation is the
-//! compiler's, below this boundary.
+//! lives in [`nmp_native_runtime::compile_feed_params`]. The generic C-ABI
+//! doorway therefore lives HERE — the composition layer that can name both
+//! `NmpApp` and the compiler — and hands the same single canonical compiler to
+//! `open_feed` for every scope. The per-app primary-kind decision is the app's
+//! (it builds the `FeedParams`); wrapper/delete derivation is the compiler's,
+//! below this boundary.
 //!
 //! ## Doctrine
 //!
-//! * **D0** — this crate is the composition point; `nmp-ffi` / `nmp-core` name
-//!   no `FeedScope`. The compiler resolves scope semantics.
+//! * **D0** — this crate is the composition point; `nmp-core` names no
+//!   `FeedScope`. The compiler resolves scope semantics.
 //! * **D4** — close/page address the session by HANDLE; no re-derived filter,
 //!   no second feed engine. `open_feed` records the compiler's teardown recipe.
 //! * **D6** — every entry is fail-closed: a null `app`, malformed params JSON,
@@ -34,13 +33,13 @@
 use std::ffi::{c_char, CString};
 
 use nmp_feed::{FeedHandle, FeedParams};
-use nmp_ffi::{FeedOpenError, NmpApp};
+use nmp_native_runtime::{FeedOpenError, NmpApp};
 
 use super::helpers::c_string_opt;
 
 /// The SINGLE compiler every public `open_feed` routes through: the closed
-/// perspective compiler in `nmp-defaults`. `open_feed` validates primary kinds
-/// and derives wrapper acquisition below this boundary before it runs.
+/// perspective compiler in `nmp-native-runtime`. `open_feed` validates primary
+/// kinds and derives wrapper acquisition below this boundary before it runs.
 fn compiler(
     app: &NmpApp,
     params: &FeedParams,

@@ -10,7 +10,7 @@ use std::ffi::CString;
 
 use nmp_nip01::NoteRecord;
 
-use nmp_ffi::{
+use nmp_app_chirp::ffi::{
     nmp_app_add_relay, nmp_app_cancel_action, nmp_app_remove_account, nmp_app_remove_relay,
     nmp_app_retry_publish, nmp_app_switch_active,
 };
@@ -187,7 +187,7 @@ impl AppRuntime {
             return;
         }
         if let Ok(c) = CString::new(correlation_id) {
-            unsafe { nmp_ffi::nmp_app_ack_action_stage(self.app, c.as_ptr()) };
+            unsafe { nmp_app_chirp::ffi::nmp_app_ack_action_stage(self.app, c.as_ptr()) };
         }
     }
 }

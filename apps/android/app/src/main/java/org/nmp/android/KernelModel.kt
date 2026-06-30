@@ -138,8 +138,8 @@ class KernelModel : ViewModel() {
 
     /**
      * Cold-start the kernel: install the Keystore keyring capability, start the
-     * actor (which runs the Rust-side identity-restore read chain), wire the
-     * push listeners, and register Marmot against the restored key.
+     * actor (which runs the Rust-side identity-restore read chain), and wire the
+     * push listeners.
      *
      * The keyring capability + identity-restore are UNCONDITIONAL (production
      * and debug). This is the fix for the v1 regression where they only ran on a
@@ -147,8 +147,6 @@ class KernelModel : ViewModel() {
      * on sign-in and restores it on launch exclusively through this capability,
      * so without it a signed-in user was logged out on every restart.
      *
-     * [testNsec] is null in production; pass a non-null nsec only in headless UI
-     * tests (it signs that secret in instead of reading the persisted one).
      * [testRelays] is null in production; when non-null it must be a JSON array
      * of `["url","role"]` pairs that REPLACES the Chirp reference relays — used
      * by E2E harnesses to point the kernel at a local relay (e.g. `nak serve`).
@@ -159,7 +157,6 @@ class KernelModel : ViewModel() {
     fun start(
         context: Context,
         storagePath: String? = null,
-        testNsec: String? = null,
         testRelays: String? = null,
     ) {
         if (started) return
@@ -176,8 +173,6 @@ class KernelModel : ViewModel() {
                 onSignerRequest = { requestJson -> dispatchSignerRequestToMain(requestJson) },
             ),
             storagePath = storagePath,
-            dbDir = storagePath ?: context.filesDir.path,
-            testNsec = testNsec,
             testRelays = testRelays,
         )
     }
@@ -349,15 +344,6 @@ class KernelModel : ViewModel() {
     // extension functions in KernelModelAccounts.kt and KernelModelActions.kt
     // (same package, no import required). Extracted to keep this file under the
     // 500-LOC ceiling (AGENTS.md File Size). Public API surface is unchanged.
-
-    // -------------------------------------------------------------------------
-    // Marmot registration trampoline — write ops live in [marmot: MarmotActions]
-    // -------------------------------------------------------------------------
-
-    /** Idempotent per-account Marmot MLS registration. [dbDir] = context.filesDir.path. */
-    fun registerMarmotIfNeeded(dbDir: String) {
-        marmot.registerIfNeeded(state.value.activeAccount, dbDir, bridge)
-    }
 
     /**
      * Decode one FlatBuffers update frame (single pass: SnapshotEnvelope + typed

@@ -32,11 +32,6 @@
 //!   default set has ONE source of truth and the Swift/Kotlin shells never
 //!   hardcode relay URLs (D7). iOS analogue of the Android
 //!   `nmp-chirp-android-ffi::relay_seeding` glue.
-//! - `nmp_app_chirp_identity_restore`,
-//!   `nmp_app_chirp_identity_sign_in_nsec`, and
-//!   `nmp_app_chirp_identity_remove_account` — Chirp-owned identity wrappers
-//!   that register the reusable Marmot projection without leaking Chirp symbol
-//!   policy into `nmp-marmot`.
 //!
 //! ## Doctrine
 //!
@@ -62,10 +57,9 @@ mod feed;
 mod group;
 mod handle;
 mod helpers;
-#[cfg(feature = "marmot")]
-mod identity;
 mod register;
 mod relay_seeding;
+mod runtime_ffi;
 mod snapshot;
 mod tag_feed;
 mod typed_actions;
@@ -75,24 +69,21 @@ mod tests;
 
 pub use create_account::nmp_app_chirp_create_new_account;
 pub use declared_projections::nmp_app_chirp_declare_consumed_projections;
+pub use nmp_native_runtime::{NmpApp, NmpConfigStatus};
 // #1740 step 7 — the ONE public app-facing feed doorway (typed params in,
 // opaque handle out). Replaces per-feed-type opens with a single generic entry.
 pub use feed::{nmp_app_close_feed, nmp_app_open_feed};
 pub use group::{
     nmp_app_chirp_close_group_discovery, nmp_app_chirp_open_group_discovery,
-    nmp_app_chirp_register_group_events, nmp_app_chirp_unregister_group_events,
+    nmp_app_chirp_register_group_events, nmp_app_chirp_unregister_group_events, GroupFeedHandle,
 };
 pub use handle::ChirpHandle;
-#[cfg(feature = "marmot")]
-pub use identity::{
-    nmp_app_chirp_identity_remove_account, nmp_app_chirp_identity_restore,
-    nmp_app_chirp_identity_sign_in_nsec,
-};
 pub use register::{
     nmp_app_chirp_register, nmp_app_chirp_register_dm_inbox, nmp_app_chirp_register_follow_list,
     NmpRegisterStatus,
 };
 pub use relay_seeding::{nmp_app_chirp_seed_default_relays, nmp_app_chirp_seed_relays_from_json};
+pub use runtime_ffi::*;
 pub use snapshot::nmp_app_chirp_unregister;
 pub use tag_feed::{nmp_app_chirp_close_tag_feed, nmp_app_chirp_open_tag_feed};
 pub use typed_actions::nmp_app_chirp_dispatch_action_bytes;

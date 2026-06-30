@@ -6,15 +6,14 @@ use std::sync::mpsc::Receiver;
 use nmp_app_chirp::ffi::{nmp_app_chirp_register_dm_inbox, nmp_app_chirp_register_follow_list};
 use nmp_app_chirp::{
     follow_spec, nmp_app_chirp_close_group_discovery, nmp_app_chirp_declare_consumed_projections,
-    nmp_app_chirp_identity_restore, nmp_app_chirp_register, nmp_app_chirp_unregister,
-    nmp_marmot_unregister, nmp_signer_broker_init, publish_note_action, react_spec, repost_spec,
-    unfollow_spec, ChirpHandle, MarmotHandle, NmpRegisterStatus,
+    nmp_app_chirp_register, nmp_app_chirp_unregister, nmp_signer_broker_init, publish_note_action,
+    react_spec, repost_spec, unfollow_spec, ChirpHandle, NmpRegisterStatus,
 };
 use nmp_core::tags::Nip10Refs;
 use nmp_nip01::NoteRecord;
 
 use crate::app::ReplyTarget;
-use nmp_ffi::{
+use nmp_app_chirp::ffi::{
     nmp_app_free, nmp_app_load_older_feed, nmp_app_release_profile_ref,
     nmp_app_resolve_profile_card_live, nmp_app_resolve_profile_ref, nmp_app_start, GroupFeedHandle,
     NmpApp, NmpConfigStatus,
@@ -38,7 +37,6 @@ mod feed;
 pub struct AppRuntime {
     app: *mut NmpApp,
     chirp: *mut ChirpHandle,
-    pub(crate) marmot: Cell<*mut MarmotHandle>,
     /// Open group-discovery handle; closed (and replaced) on each `discover_groups`
     /// call, then finally freed in `Drop`. `null_mut()` when inactive.
     pub(crate) discovery: Cell<*mut GroupFeedHandle>,
@@ -49,7 +47,7 @@ pub struct AppRuntime {
 impl AppRuntime {
     #[must_use]
     pub fn new() -> Result<(Self, Receiver<NmpEvent>)> {
-        let app = nmp_ffi::nmp_app_new();
+        let app = nmp_app_chirp::ffi::nmp_app_new();
         if app.is_null() {
             return Err("nmp_app_new returned null".to_string());
         }
@@ -61,7 +59,7 @@ impl AppRuntime {
             ));
         }
 
-        nmp_ffi::nmp_app_set_capability_callback(
+        nmp_app_chirp::ffi::nmp_app_set_capability_callback(
             app,
             ptr::null_mut(),
             Some(crate::keyring::keyring_handler),
@@ -84,20 +82,6 @@ impl AppRuntime {
         nmp_app_chirp_register_dm_inbox(app);
         nmp_app_chirp_register_follow_list(app, ptr::null());
 
-        let db_dir = crate::keyring::chirp_data_dir()
-            .map(|p| p.join("marmot"))
-            .and_then(|p| std::fs::create_dir_all(&p).ok().map(|_| p));
-        let marmot = db_dir.and_then(|dir| {
-            let dir_c = CString::new(dir.to_string_lossy().as_ref()).ok()?;
-            let h = nmp_app_chirp_identity_restore(app, dir_c.as_ptr(), ptr::null());
-            if h.is_null() {
-                None
-            } else {
-                Some(h)
-            }
-        });
-        let initial_marmot = marmot.unwrap_or(ptr::null_mut());
-
         // ADR-0053 / Workstream-E4 — declare projection-consumption intent
         // BEFORE start. chirp-tui is a full client (reads every kernel built-in),
         // so it consumes all explicitly; an undeclared start is a loud
@@ -111,7 +95,6 @@ impl AppRuntime {
             Self {
                 app,
                 chirp,
-                marmot: Cell::new(initial_marmot),
                 discovery: Cell::new(ptr::null_mut()),
                 feed_handles: RefCell::new(feed::FeedHandles {
                     home: home_feed_handle,
@@ -126,7 +109,7 @@ impl AppRuntime {
     pub fn add_relay(&self, url: &str, role: &str) -> Result<()> {
         let url = CString::new(url).map_err(|_| "relay URL contains NUL byte".to_string())?;
         let role = CString::new(role).map_err(|_| "relay role contains NUL byte".to_string())?;
-        nmp_ffi::nmp_app_add_relay(self.app, url.as_ptr(), role.as_ptr());
+        nmp_app_chirp::ffi::nmp_app_add_relay(self.app, url.as_ptr(), role.as_ptr());
         Ok(())
     }
 
@@ -228,7 +211,7 @@ impl AppRuntime {
 
     pub fn ack_action_stage(&self, correlation_id: &str) -> Result<()> {
         self.with_cstr(correlation_id, |c| {
-            nmp_ffi::nmp_app_ack_action_stage(self.app, c.as_ptr())
+            nmp_app_chirp::ffi::nmp_app_ack_action_stage(self.app, c.as_ptr())
         })
     }
 
@@ -252,8 +235,7 @@ impl AppRuntime {
     /// `nmp_app_chirp::dispatch_bytes` seam encodes it into the namespace's typed
     /// [`ActionPayload`] bytes, wraps it in a host-minted dispatch envelope, and
     /// calls `nmp_app_dispatch_action_bytes` — the JSON never crosses the FFI
-    /// (ADR-0064 / Cut-B, #1756). The Marmot path is unaffected: it uses the
-    /// native `MarmotHandle::dispatch` accessor, not this seam.
+    /// (ADR-0064 / Cut-B, #1756).
     pub(crate) fn dispatch_action(&self, namespace: &str, action_json: &str) -> Result<String> {
         nmp_app_chirp::dispatch_action_bytes_for(self.app, namespace, action_json)
     }
@@ -301,8 +283,9 @@ impl AppRuntime {
         }
         let consumer_id = visible_note_relations_consumer_id(event_id)?;
         let action = json!({
-            "op": op,
-            "event_id": event_id,
+            "lifecycle": op,
+            "target_event_id": event_id,
+            "target_kind": 1,
             "consumer_id": consumer_id,
         });
         self.dispatch_action_value("nmp.nip01.visible_note_relations", &action)
@@ -328,10 +311,6 @@ impl Drop for AppRuntime {
         if !self.discovery.get().is_null() {
             nmp_app_chirp_close_group_discovery(self.discovery.get());
             self.discovery.set(ptr::null_mut());
-        }
-        if !self.marmot.get().is_null() {
-            nmp_marmot_unregister(self.marmot.get());
-            self.marmot.set(ptr::null_mut());
         }
         if !self.app.is_null() {
             nmp_app_free(self.app);

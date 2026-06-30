@@ -13,7 +13,7 @@ import os.log
 // replaceable-event merging, and alphabetical ordering; the
 // `nmp.nip29.discover` action owns the relay-pinned `LogicalInterest`; the
 // `nmp.nip29.join` action owns the kind:9021 event + tags + signing. Swift
-// only marshals JSON across the FFI and mirrors the snapshot.
+// only builds typed FlatBuffers bytes (#2170) and mirrors the snapshot.
 //
 // ── Read side ─────────────────────────────────────────────────────────────
 //
@@ -78,9 +78,15 @@ extension KernelHandle {
     /// Without a successful prior `openGroupDiscovery` the projection is
     /// missing and the snapshot key stays nil (the executor still pushes the
     /// interest, but no Swift consumer mirrors it).
+    ///
+    /// Uses the typed byte doorway (`nmp_app_dispatch_action_bytes`, #2170).
     func discoverGroups(relayUrl: String) {
-        let payload: [String: Any] = ["relay_url": relayUrl]
-        dispatchDiscoverGroups(payload: payload)
+        let id = UUID().uuidString
+        let bytes = GeneratedActionBuilders.discoverGroups(
+            correlationId: id,
+            relayUrl: relayUrl
+        )
+        _ = dispatchBytes(bytes)
     }
 
     /// Dispatch a `nmp.nip29.join` action — publish a kind:9021 join
@@ -91,49 +97,21 @@ extension KernelHandle {
     /// `inviteCode`, when supplied, becomes the `["code", _]` tag on the
     /// request — closed groups consume it on first use. `reason` becomes
     /// the event content; empty/missing → no content.
+    ///
+    /// Uses the typed byte doorway (`nmp_app_dispatch_action_bytes`, #2170).
     func joinGroup(
         group: GroupId,
         inviteCode: String? = nil,
         reason: String? = nil
     ) {
-        var payload: [String: Any] = ["group": group.jsonObject]
-        if let inviteCode, !inviteCode.isEmpty {
-            payload["invite_code"] = inviteCode
-        }
-        if let reason, !reason.isEmpty {
-            payload["reason"] = reason
-        }
-        dispatchJoinGroup(payload: payload)
-    }
-
-    private func dispatchDiscoverGroups(payload: [String: Any]) {
-        dispatchGroupDiscoveryAction(
-            "nmp.nip29.discover", payload: payload, label: "discoverGroups")
-    }
-
-    private func dispatchJoinGroup(payload: [String: Any]) {
-        dispatchGroupDiscoveryAction("nmp.nip29.join", payload: payload, label: "joinGroup")
-    }
-
-    private func dispatchGroupDiscoveryAction(
-        _ namespace: String,
-        payload: [String: Any],
-        label: String
-    ) {
-        guard
-            let data = try? JSONSerialization.data(withJSONObject: payload),
-            let json = String(data: data, encoding: .utf8)
-        else {
-            gdLog.error("\(label, privacy: .public): failed to encode action payload")
-            return
-        }
-        json.withCString { jsonPtr in
-            namespace.withCString { nsPtr in
-                if let ptr = nmp_app_chirp_dispatch_action_bytes(raw, nsPtr, jsonPtr) {
-                    nmp_free_string(ptr)
-                }
-            }
-        }
+        let id = UUID().uuidString
+        let bytes = GeneratedActionBuilders.joinGroup(
+            correlationId: id,
+            group: (hostRelayUrl: group.hostRelayUrl, localId: group.localId),
+            inviteCode: inviteCode.flatMap { $0.isEmpty ? nil : $0 },
+            reason: reason.flatMap { $0.isEmpty ? nil : $0 }
+        )
+        _ = dispatchBytes(bytes)
     }
 }
 

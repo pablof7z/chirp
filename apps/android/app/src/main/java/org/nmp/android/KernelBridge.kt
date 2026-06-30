@@ -31,8 +31,8 @@ fun interface KernelSignerRequestListener {
  *
  * App-loop lifecycle (create/start/stop/close/free) and update/dispatch lanes
  * are served by the UniFFI [AppHandle] object (proc-macro bindings, JNA runtime).
- * Residual JNI lanes (signer, capability, marmot, identity, feeds, claims) remain
- * on the existing `#[no_mangle] Java_*` JNI path and are reached via [rawHandle].
+ * Residual JNI lanes (signer, capability, feeds, claims) remain on the existing
+ * `#[no_mangle] Java_*` JNI path and are reached via [rawHandle].
  *
  * Doctrine: no business logic or cached state (D5/D8). Runtime outcomes arrive
  * in the next update frame. Init-only config calls may return `NmpConfigStatus`
@@ -46,7 +46,7 @@ class KernelBridge {
     /**
      * Legacy JNI session registry id, obtained from [org.nmp.android.uniffi.AppHandle.legacyJniSessionId]
      * after construction. Used by residual JNI lanes (signer, capability,
-     * marmot, identity, feeds, claims) until they are individually migrated.
+     * feeds, claims) until they are individually migrated.
      * Zero when [appHandle] is null (post-[free] or inert-init).
      */
     @Volatile
@@ -272,39 +272,6 @@ class KernelBridge {
     }
 
     /**
-     * Register a Marmot (MLS-over-Nostr) projection against the active local
-     * account. Direct mirror of iOS
-     * `KernelHandle.registerActiveMarmotIfAvailable()`.
-     *
-     * The secret never crosses the JNI seam — `nmp_marmot_register_active`
-     * reads the actor-owned local key from the slot the kernel writes after
-     * every identity mutation. [dbDir] is the host app-support directory; the
-     * MLS SQLite state lives at `<dbDir>/marmot-mls-state.sqlite`.
-     *
-     * Returns `true` once a handle is held; `false` when no local signing key
-     * is active (signed out, or a bunker/NIP-46 account with no local key).
-     * Idempotent — re-registers cleanly (account switch), so callers may invoke
-     * it whenever the active account changes.
-     *
-     * Once registered the kernel pushes `nmp.marmot.snapshot` /
-     * `nmp.marmot.messages` projections on every snapshot tick (V-107 /
-     * ADR-0039); group write ops route through [dispatchAction] with the
-     * `"nmp.marmot"` namespace — there is no per-op native symbol.
-     */
-    fun marmotRegisterActive(dbDir: String): Boolean =
-        if (handle != 0L) nativeMarmotRegisterActive(handle, dbDir) else false
-
-    /**
-     * Drop the Marmot observer registration if one exists (sign-out path).
-     * Idempotent — safe to call when nothing is registered. [free] performs
-     * this implicitly before reclaiming the kernel, so a normal teardown does
-     * not need an explicit call.
-     */
-    fun marmotUnregister() {
-        if (handle != 0L) nativeMarmotUnregister(handle)
-    }
-
-    /**
      * Encode a hex pubkey as a NIP-19 display identifier (`nprofile1…` when
      * kind:10002 relay hints are cached, else `npub1…`). Wraps the existing
      * `nmp_app_encode_profile` C-ABI symbol — no new NMP C-ABI surface.
@@ -324,8 +291,8 @@ class KernelBridge {
      * namespaces (e.g. Android Keystore keyring). The [handler] object must
      * expose `fun handle(requestJson: String): String`.
      *
-     * Must be called BEFORE [identityRestore] so the keyring capability is
-     * live when identity-restore reads the persisted secret.
+     * Must be called BEFORE [start] so the Rust-owned launch restore can read
+     * the persisted secret through the installed capability.
      *
      * D6: null handle is a no-op. D7: the handler executes and reports; Rust
      * owns all policy.
@@ -333,27 +300,6 @@ class KernelBridge {
     fun setCapabilityHandler(handler: KeystoreKeyringCapability) {
         if (handle != 0L) nativeSetCapabilityHandler(handle, handler)
     }
-
-    /**
-     * Restore a persisted Chirp identity and register Marmot.
-     *
-     * Calls `nmp_app_chirp_identity_restore` through the JNI seam: the kernel
-     * reads the nsec from the keyring capability (via [setCapabilityHandler]),
-     * signs in the actor, and registers Marmot against the active key.
-     *
-     * [dbDir] is the host app-support directory (e.g. `context.filesDir.path`).
-     * [testNsec] is null in production; pass a non-null nsec string only in
-     * headless UI tests.
-     *
-     * Returns `true` when a Marmot identity was registered (a local key was
-     * found), `false` when no persisted local key exists (first cold-start,
-     * bunker / NIP-55 account, or the `marmot` feature is disabled).
-     *
-     * D6: null/dead handle or any Rust-side failure returns false without
-     * panicking across the JNI seam.
-     */
-    fun identityRestore(dbDir: String, testNsec: String? = null): Boolean =
-        handle != 0L && nativeIdentityRestore(handle, dbDir, testNsec)
 
     /**
      * Expose the raw Android JNI Session pointer (`jlong`) to same-process
@@ -413,7 +359,7 @@ class KernelBridge {
     //   nativeDispatchIntentBytes, nativeDispatchActionBytes.
     //
     // The remaining declarations below are for residual JNI lanes (signer,
-    // capability, marmot, identity, feeds, claims) staged for future migration.
+    // capability, feeds, claims) staged for future migration.
     private external fun nativeSetStoragePath(handle: Long, path: String): Int
     private external fun nativeOpenHomeFeed(handle: Long): String?
     private external fun nativeCreateLocalAccount(handle: Long, displayName: String)
@@ -461,9 +407,6 @@ class KernelBridge {
     internal external fun nativeNostrConnectUri(handle: Long, callbackScheme: String?): String?
     private external fun nativeSwitchAccount(handle: Long, pubkey: String)
     private external fun nativeRemoveAccount(handle: Long, pubkey: String)
-    private external fun nativeMarmotRegisterActive(handle: Long, dbDir: String): Boolean
-    private external fun nativeMarmotUnregister(handle: Long)
     private external fun nativeEncodeProfile(handle: Long, pubkey: String): String?
     private external fun nativeSetCapabilityHandler(handle: Long, handler: Any)
-    private external fun nativeIdentityRestore(handle: Long, dbDir: String, testNsec: String?): Boolean
 }

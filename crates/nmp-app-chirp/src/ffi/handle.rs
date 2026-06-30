@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use nmp_ffi::NmpApp;
+use nmp_native_runtime::NmpApp;
 use nmp_nip01::OpFeedEngine;
 
 /// Opaque handle returned by [`super::nmp_app_chirp_register`]. Boxed on the heap

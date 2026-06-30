@@ -11,23 +11,22 @@
 //! construction here. Raw FFI methods (add_relay, open_timeline, etc.) remain
 //! unchanged.
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::ptr;
 use std::sync::mpsc::{self, Receiver, Sender};
 
 use nmp_app_chirp::ffi::{nmp_app_chirp_register_dm_inbox, nmp_app_chirp_register_follow_list};
-use nmp_app_chirp::{
-    nmp_app_cancel_bunker_handshake, nmp_app_chirp_declare_consumed_projections,
-    nmp_app_chirp_register, nmp_app_chirp_unregister, nmp_app_nostrconnect_uri,
-    nmp_marmot_unregister, nmp_signer_broker_init, ChirpClient, ChirpHandle, MarmotHandle,
-    NmpRegisterStatus,
-};
-use nmp_ffi::{
+use nmp_app_chirp::ffi::{
     nmp_app_free, nmp_app_load_older_feed, nmp_app_release_profile_ref,
     nmp_app_resolve_profile_card_live, nmp_app_resolve_profile_ref,
     nmp_app_set_capability_callback, nmp_app_signin_nsec, nmp_app_start, nmp_free_string, NmpApp,
     NmpConfigStatus,
+};
+use nmp_app_chirp::{
+    nmp_app_cancel_bunker_handshake, nmp_app_chirp_declare_consumed_projections,
+    nmp_app_chirp_register, nmp_app_chirp_unregister, nmp_app_nostrconnect_uri,
+    nmp_signer_broker_init, ChirpClient, ChirpHandle, NmpRegisterStatus,
 };
 
 // ADR-0063 (#1671 Lane F) — typed resolve_ref / release_ref consumer ids.
@@ -70,7 +69,7 @@ impl NmpUpdateBridge {
         // SAFETY: `app` is a valid, non-null pointer from `nmp_app_new`.
         // `context` points to the bridge instance stored in AppRuntime.
         unsafe {
-            nmp_ffi::nmp_app_set_update_callback(app, context, Some(on_update));
+            nmp_app_chirp::ffi::nmp_app_set_update_callback(app, context, Some(on_update));
         }
     }
 }
@@ -78,7 +77,7 @@ impl NmpUpdateBridge {
 pub fn unregister_callback(app: *mut NmpApp) {
     // SAFETY: clearing the callback is safe even if app is null.
     unsafe {
-        nmp_ffi::nmp_app_set_update_callback(app, ptr::null_mut(), None);
+        nmp_app_chirp::ffi::nmp_app_set_update_callback(app, ptr::null_mut(), None);
     }
 }
 
@@ -101,7 +100,6 @@ pub struct AppRuntime {
     /// instead of re-implementing JSON construction here.
     client: ChirpClient,
     chirp: *mut ChirpHandle,
-    marmot: Cell<*mut MarmotHandle>,
     feed_handles: RefCell<feed::FeedHandles>,
     /// Owns the FFI callback box registered with the actor thread.
     update_bridge: Option<Box<NmpUpdateBridge>>,
@@ -110,7 +108,7 @@ pub struct AppRuntime {
 impl AppRuntime {
     #[must_use]
     pub fn new() -> Option<(Self, Receiver<NmpEvent>)> {
-        let app = unsafe { nmp_ffi::nmp_app_new() };
+        let app = unsafe { nmp_app_chirp::ffi::nmp_app_new() };
         if app.is_null() {
             return None;
         }
@@ -144,9 +142,6 @@ impl AppRuntime {
             nmp_app_chirp_register_follow_list(app, ptr::null());
         }
 
-        let marmot = None;
-        let initial_marmot = marmot.unwrap_or(ptr::null_mut());
-
         // ADR-0053/E4 — declare projection-consumption intent BEFORE start
         // (chirp-desktop is a full client; undeclared start is a loud bug).
         nmp_app_chirp_declare_consumed_projections(app);
@@ -162,7 +157,6 @@ impl AppRuntime {
                 app,
                 client: ChirpClient::new(app),
                 chirp,
-                marmot: Cell::new(initial_marmot),
                 feed_handles: RefCell::new(feed::FeedHandles {
                     home: home_feed_handle,
                     ..feed::FeedHandles::default()
@@ -320,10 +314,6 @@ impl Drop for AppRuntime {
         if !self.chirp.is_null() {
             unsafe { nmp_app_chirp_unregister(self.chirp) };
             self.chirp = ptr::null_mut();
-        }
-        if !self.marmot.get().is_null() {
-            unsafe { nmp_marmot_unregister(self.marmot.get()) };
-            self.marmot.set(ptr::null_mut());
         }
         if !self.app.is_null() {
             unsafe { nmp_app_free(self.app) };

@@ -10,7 +10,7 @@ use egui::{Color32, RichText, Ui};
 use nmp_content::{
     tokenize_with_kind, EmbedKindProjection, EmbeddedEventEnvelope, RenderMode, Segment,
 };
-use nmp_core::nip21::NostrUri;
+use nmp_nostr_id::NostrUri;
 
 use crate::snapshot::ProfileCard;
 
@@ -286,7 +286,7 @@ mod tests {
         // a Segment::Mention(Profile{pubkey}), so the resolved set must contain
         // exactly that pubkey (matching what mention_label draws on screen).
         let pubkey = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d";
-        let npub = nmp_core::nip19::encode_npub(pubkey).expect("fixture npub encodes");
+        let npub = nmp_nostr_id::encode_npub(pubkey).expect("fixture npub encodes");
         let content = format!("hello nostr:{npub} how are you");
 
         let mut out = std::collections::HashSet::new();

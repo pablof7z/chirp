@@ -4,40 +4,24 @@ import os.log
 private let pgLog = Logger(subsystem: "io.f7z.chirp", category: "PublicGroupBridge")
 
 extension KernelHandle {
+    /// Dispatch a `nmp.nip29.create_public_group` action via the typed byte
+    /// doorway (`nmp_app_dispatch_action_bytes`, #2170). Defaults to
+    /// `GroupVisibility::Public (0)` and `GroupAccess::Open (0)` — the
+    /// current Chirp UI does not expose those fields. Returns the decoded
+    /// `DispatchResult`.
     @discardableResult
     func createPublicGroup(group: GroupId, name: String, about: String?) -> DispatchResult {
-        var payload: [String: Any] = [
-            "group": group.jsonObject,
-            "name": name,
-        ]
-        if let about, !about.isEmpty {
-            payload["about"] = about
-        }
-        guard
-            let data = try? JSONSerialization.data(withJSONObject: payload),
-            let json = String(data: data, encoding: .utf8)
-        else {
-            pgLog.error("createPublicGroup: failed to encode action payload")
-            return .failure("failed to encode public group create payload")
-        }
-        return dispatchCreatePublicGroup(bodyJson: json)
-    }
-
-    @discardableResult
-    private func dispatchCreatePublicGroup(bodyJson: String) -> DispatchResult {
-        let namespace = "nmp.nip29.create_public_group"
-        let envelope: String? = bodyJson.withCString { jsonPtr in
-            namespace.withCString { nsPtr in
-                guard let ptr = nmp_app_chirp_dispatch_action_bytes(raw, nsPtr, jsonPtr) else {
-                    return nil
-                }
-                defer { nmp_free_string(ptr) }
-                return String(cString: ptr)
-            }
-        }
-        guard let envelope else {
-            return .failure("dispatch returned a null envelope")
-        }
-        return DispatchResult.parse(envelope: envelope)
+        let id = UUID().uuidString
+        let bytes = GeneratedActionBuilders.createPublicGroup(
+            correlationId: id,
+            group: (hostRelayUrl: group.hostRelayUrl, localId: group.localId),
+            name: name,
+            about: about.flatMap { $0.isEmpty ? nil : $0 },
+            picture: nil,
+            visibility: 0, // GroupVisibility::Public
+            access: 0,     // GroupAccess::Open
+            parent: nil
+        )
+        return dispatchBytes(bytes)
     }
 }

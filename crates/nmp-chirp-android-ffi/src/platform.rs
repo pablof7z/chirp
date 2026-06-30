@@ -7,10 +7,9 @@ use jni::objects::{JClass, JString};
 use jni::sys::{jboolean, jint, jlong};
 use jni::JNIEnv;
 
-use nmp_ffi::{
-    NmpConfigStatus,
+use nmp_app_chirp::ffi::{
     nmp_app_is_alive, nmp_app_lifecycle_background, nmp_app_lifecycle_foreground,
-    nmp_app_load_older_feed, nmp_app_set_storage_path,
+    nmp_app_load_older_feed, nmp_app_set_storage_path, NmpConfigStatus,
 };
 
 use crate::{jstring_to_cstring, session_arc};

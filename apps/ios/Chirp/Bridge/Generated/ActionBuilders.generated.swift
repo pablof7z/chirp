@@ -566,6 +566,467 @@ public enum GeneratedActionBuilders {
         )
     }
 
+    /// Publish a NIP-84 kind:9802 highlight annotation.
+    /// Builds the `nmp.nip84.publish_highlight` `DispatchEnvelope` bytes for the byte doorway.
+    public static func publishHighlight(
+        correlationId: String,
+        content: String,
+        context: String?,
+        sourceEventId: String?,
+        sourceAddress: String?,
+        sourceAuthorPubkey: String?,
+        alt: String?,
+        externalIds: [String]?
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let contentOffset = fbb.create(string: content)
+        let contextOffset: Offset = context.map { fbb.create(string: $0) } ?? Offset()
+        let sourceEventIdOffset: Offset = sourceEventId.map { fbb.create(string: $0) } ?? Offset()
+        let sourceAddressOffset: Offset = sourceAddress.map { fbb.create(string: $0) } ?? Offset()
+        let sourceAuthorPubkeyOffset: Offset = sourceAuthorPubkey.map { fbb.create(string: $0) } ?? Offset()
+        let altOffset: Offset = alt.map { fbb.create(string: $0) } ?? Offset()
+        let externalIdsOffset: Offset = {
+            guard let values = externalIds, !values.isEmpty else { return Offset() }
+            let offsets = values.map { fbb.create(string: $0) }
+            return fbb.createVector(ofOffsets: offsets)
+        }()
+        let payloadStart = fbb.startTable(with: 8)
+        fbb.add(element: UInt32(2), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(offset: contentOffset, at: 6) // slot 1: content
+        if contextOffset.o != 0 { fbb.add(offset: contextOffset, at: 8) } // slot 2: context
+        if sourceEventIdOffset.o != 0 { fbb.add(offset: sourceEventIdOffset, at: 10) } // slot 3: sourceEventId
+        if sourceAddressOffset.o != 0 { fbb.add(offset: sourceAddressOffset, at: 12) } // slot 4: sourceAddress
+        if sourceAuthorPubkeyOffset.o != 0 { fbb.add(offset: sourceAuthorPubkeyOffset, at: 14) } // slot 5: sourceAuthorPubkey
+        if altOffset.o != 0 { fbb.add(offset: altOffset, at: 16) } // slot 6: alt
+        if externalIdsOffset.o != 0 { fbb.add(offset: externalIdsOffset, at: 18) } // slot 7: externalIds
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "N84H")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.nip84.publish_highlight",
+            payload: payload
+        )
+    }
+
+    /// Publish a NIP-22 kind:1111 comment.
+    /// Builds the `nmp.nip22.post_comment` `DispatchEnvelope` bytes for the byte doorway.
+    public static func postComment(
+        correlationId: String,
+        rootTagName: String,
+        rootTagValue: String,
+        rootKind: UInt32,
+        parentEventId: String?,
+        rootAuthorPubkey: String?,
+        parentAuthorPubkey: String?,
+        content: String
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let rootTagNameOffset = fbb.create(string: rootTagName)
+        let rootTagValueOffset = fbb.create(string: rootTagValue)
+        let parentEventIdOffset: Offset = parentEventId.map { fbb.create(string: $0) } ?? Offset()
+        let rootAuthorPubkeyOffset: Offset = rootAuthorPubkey.map { fbb.create(string: $0) } ?? Offset()
+        let parentAuthorPubkeyOffset: Offset = parentAuthorPubkey.map { fbb.create(string: $0) } ?? Offset()
+        let contentOffset = fbb.create(string: content)
+        let payloadStart = fbb.startTable(with: 8)
+        fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(offset: rootTagNameOffset, at: 6) // slot 1: rootTagName
+        fbb.add(offset: rootTagValueOffset, at: 8) // slot 2: rootTagValue
+        fbb.add(element: UInt32(rootKind), def: UInt32(0), at: 10) // slot 3: rootKind
+        if parentEventIdOffset.o != 0 { fbb.add(offset: parentEventIdOffset, at: 12) } // slot 4: parentEventId
+        if rootAuthorPubkeyOffset.o != 0 { fbb.add(offset: rootAuthorPubkeyOffset, at: 14) } // slot 5: rootAuthorPubkey
+        if parentAuthorPubkeyOffset.o != 0 { fbb.add(offset: parentAuthorPubkeyOffset, at: 16) } // slot 6: parentAuthorPubkey
+        fbb.add(offset: contentOffset, at: 18) // slot 7: content
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "N22C")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.nip22.post_comment",
+            payload: payload
+        )
+    }
+
+    /// Add an item to a NIP-51 kind:30003 bookmark or kind:30004 curation set.
+    /// Builds the `nmp.nip51.add_bookmark_set_item` `DispatchEnvelope` bytes for the byte doorway.
+    public static func addBookmarkSetItem(
+        correlationId: String,
+        accountPubkey: String,
+        setKind: UInt8,
+        identifier: String,
+        itemKind: UInt8,
+        value: String,
+        relay: String?
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let accountPubkeyOffset = fbb.create(string: accountPubkey)
+        let identifierOffset = fbb.create(string: identifier)
+        let valueOffset = fbb.create(string: value)
+        let relayOffset: Offset = relay.map { fbb.create(string: $0) } ?? Offset()
+        let itemStart = fbb.startTable(with: 3)
+        fbb.add(element: itemKind, def: UInt8(0), at: 4) // slot 0: kind
+        fbb.add(offset: valueOffset, at: 6) // slot 1: value
+        if relayOffset.o != 0 { fbb.add(offset: relayOffset, at: 8) } // slot 2: relay
+        let itemRoot = Offset(offset: fbb.endTable(at: itemStart))
+        let payloadStart = fbb.startTable(with: 5)
+        fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(offset: accountPubkeyOffset, at: 6) // slot 1: account_pubkey
+        fbb.add(element: setKind, def: UInt8(0), at: 8) // slot 2: set_kind
+        fbb.add(offset: identifierOffset, at: 10) // slot 3: identifier
+        fbb.add(offset: itemRoot, at: 12) // slot 4: item
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "N51S")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.nip51.add_bookmark_set_item",
+            payload: payload
+        )
+    }
+
+    /// Remove an item from a NIP-51 kind:30003 bookmark or kind:30004 curation set.
+    /// Builds the `nmp.nip51.remove_bookmark_set_item` `DispatchEnvelope` bytes for the byte doorway.
+    public static func removeBookmarkSetItem(
+        correlationId: String,
+        accountPubkey: String,
+        setKind: UInt8,
+        identifier: String,
+        itemKind: UInt8,
+        value: String,
+        relay: String?
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let accountPubkeyOffset = fbb.create(string: accountPubkey)
+        let identifierOffset = fbb.create(string: identifier)
+        let valueOffset = fbb.create(string: value)
+        let relayOffset: Offset = relay.map { fbb.create(string: $0) } ?? Offset()
+        let itemStart = fbb.startTable(with: 3)
+        fbb.add(element: itemKind, def: UInt8(0), at: 4) // slot 0: kind
+        fbb.add(offset: valueOffset, at: 6) // slot 1: value
+        if relayOffset.o != 0 { fbb.add(offset: relayOffset, at: 8) } // slot 2: relay
+        let itemRoot = Offset(offset: fbb.endTable(at: itemStart))
+        let payloadStart = fbb.startTable(with: 5)
+        fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(offset: accountPubkeyOffset, at: 6) // slot 1: account_pubkey
+        fbb.add(element: setKind, def: UInt8(0), at: 8) // slot 2: set_kind
+        fbb.add(offset: identifierOffset, at: 10) // slot 3: identifier
+        fbb.add(offset: itemRoot, at: 12) // slot 4: item
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "N51S")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.nip51.remove_bookmark_set_item",
+            payload: payload
+        )
+    }
+
+    /// Publish or update a NIP-B0 kind:39701 web bookmark.
+    /// Builds the `nmp.nip51.publish_web_bookmark` `DispatchEnvelope` bytes for the byte doorway.
+    public static func publishWebBookmark(
+        correlationId: String,
+        accountPubkey: String,
+        url: String,
+        title: String?,
+        description: String?,
+        publishedAt: UInt64?,
+        hashtags: [String]?
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let accountPubkeyOffset = fbb.create(string: accountPubkey)
+        let urlOffset = fbb.create(string: url)
+        let titleOffset: Offset = title.map { fbb.create(string: $0) } ?? Offset()
+        let descriptionOffset: Offset = description.map { fbb.create(string: $0) } ?? Offset()
+        let hashtagsOffset: Offset = {
+            guard let values = hashtags, !values.isEmpty else { return Offset() }
+            let offsets = values.map { fbb.create(string: $0) }
+            return fbb.createVector(ofOffsets: offsets)
+        }()
+        let payloadStart = fbb.startTable(with: 8)
+        fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(offset: accountPubkeyOffset, at: 6) // slot 1: accountPubkey
+        fbb.add(offset: urlOffset, at: 8) // slot 2: url
+        if titleOffset.o != 0 { fbb.add(offset: titleOffset, at: 10) } // slot 3: title
+        if descriptionOffset.o != 0 { fbb.add(offset: descriptionOffset, at: 12) } // slot 4: description
+        if let publishedAtVal = publishedAt {
+            fbb.add(element: publishedAtVal, def: UInt64(0), at: 14) // slot 5: publishedAt
+            fbb.add(element: true, def: false, at: 16) // slot 6: hasPublishedAt
+        }
+        if hashtagsOffset.o != 0 { fbb.add(offset: hashtagsOffset, at: 18) } // slot 7: hashtags
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "N51W")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.nip51.publish_web_bookmark",
+            payload: payload
+        )
+    }
+
+    /// Upload a file via BUD-02 to one or more Blossom servers.
+    /// Builds the `nmp.blossom.upload` `DispatchEnvelope` bytes for the byte doorway.
+    public static func blossomUpload(
+        correlationId: String,
+        filePath: String,
+        contentType: String?,
+        servers: [String]?,
+        signerPubkey: String?
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let filePathOffset = fbb.create(string: filePath)
+        let contentTypeOffset: Offset = contentType.map { fbb.create(string: $0) } ?? Offset()
+        let serversOffset: Offset = {
+            guard let values = servers, !values.isEmpty else { return Offset() }
+            let offsets = values.map { fbb.create(string: $0) }
+            return fbb.createVector(ofOffsets: offsets)
+        }()
+        let signerPubkeyOffset: Offset = signerPubkey.map { fbb.create(string: $0) } ?? Offset()
+        let payloadStart = fbb.startTable(with: 5)
+        fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(offset: filePathOffset, at: 6) // slot 1: filePath
+        if contentTypeOffset.o != 0 { fbb.add(offset: contentTypeOffset, at: 8) } // slot 2: contentType
+        if serversOffset.o != 0 { fbb.add(offset: serversOffset, at: 10) } // slot 3: servers
+        if signerPubkeyOffset.o != 0 { fbb.add(offset: signerPubkeyOffset, at: 12) } // slot 4: signerPubkey
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "BUPL")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.blossom.upload",
+            payload: payload
+        )
+    }
+
+    /// Claim or release the tailing interest for a note's visible relations (NIP-01).
+    /// Builds the `nmp.nip01.visible_note_relations` `DispatchEnvelope` bytes for the byte doorway.
+    public static func visibleNoteRelations(
+        correlationId: String,
+        lifecycle: UInt8,
+        targetEventId: String,
+        targetKind: UInt32,
+        consumerId: String,
+        targetAddress: String?
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let targetEventIdOffset = fbb.create(string: targetEventId)
+        let consumerIdOffset = fbb.create(string: consumerId)
+        let targetAddressOffset: Offset = targetAddress.map { fbb.create(string: $0) } ?? Offset()
+        let payloadStart = fbb.startTable(with: 6)
+        fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(element: lifecycle, def: UInt8(0), at: 6) // slot 1: lifecycle
+        fbb.add(offset: targetEventIdOffset, at: 8) // slot 2: targetEventId
+        fbb.add(element: UInt32(targetKind), def: UInt32(0), at: 10) // slot 3: targetKind
+        fbb.add(offset: consumerIdOffset, at: 12) // slot 4: consumerId
+        if targetAddressOffset.o != 0 { fbb.add(offset: targetAddressOffset, at: 14) } // slot 5: targetAddress
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "VNRL")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.nip01.visible_note_relations",
+            payload: payload
+        )
+    }
+
+    /// Open or close a relay-pinned browse subscription.
+    /// Builds the `nmp.browse_relay` `DispatchEnvelope` bytes for the byte doorway.
+    public static func browseRelay(
+        correlationId: String,
+        op: UInt8,
+        relayUrl: String?,
+        kinds: [UInt32]?,
+        lifecycle: UInt8,
+        interestId: UInt64
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let relayUrlOffset: Offset = relayUrl.map { fbb.create(string: $0) } ?? Offset()
+        let kindsOffset: Offset = {
+            guard let values = kinds, !values.isEmpty else { return Offset() }
+            return fbb.createVector(values)
+        }()
+        let payloadStart = fbb.startTable(with: 6)
+        fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(element: op, def: UInt8(0), at: 6) // slot 1: op
+        if relayUrlOffset.o != 0 { fbb.add(offset: relayUrlOffset, at: 8) } // slot 2: relayUrl
+        if kindsOffset.o != 0 { fbb.add(offset: kindsOffset, at: 10) } // slot 3: kinds
+        fbb.add(element: lifecycle, def: UInt8(0), at: 12) // slot 4: lifecycle
+        fbb.add(element: interestId, def: UInt64(0), at: 14) // slot 5: interestId
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "NBRW")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.browse_relay",
+            payload: payload
+        )
+    }
+
+    /// Claim or release a NIP-23 topic-articles subscription.
+    /// Builds the `nmp.app.topic_articles` `DispatchEnvelope` bytes for the byte doorway.
+    public static func topicArticles(
+        correlationId: String,
+        op: UInt8,
+        topic: String,
+        consumerId: String
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let topicOffset = fbb.create(string: topic)
+        let consumerIdOffset = fbb.create(string: consumerId)
+        let payloadStart = fbb.startTable(with: 4)
+        fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(element: op, def: UInt8(0), at: 6) // slot 1: op
+        fbb.add(offset: topicOffset, at: 8) // slot 2: topic
+        fbb.add(offset: consumerIdOffset, at: 10) // slot 3: consumerId
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "NTPC")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.app.topic_articles",
+            payload: payload
+        )
+    }
+
+    /// Discover NIP-29 groups hosted on a relay.
+    /// Builds the `nmp.nip29.discover` `DispatchEnvelope` bytes for the byte doorway.
+    public static func discoverGroups(
+        correlationId: String,
+        relayUrl: String
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let relayUrlOffset = fbb.create(string: relayUrl)
+        let payloadStart = fbb.startTable(with: 2)
+        fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(offset: relayUrlOffset, at: 6) // slot 1: relayUrl
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "N29D")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.nip29.discover",
+            payload: payload
+        )
+    }
+
+    /// Publish an event to a NIP-29 group (any kind).
+    /// Builds the `nmp.nip29.publish_group_event` `DispatchEnvelope` bytes for the byte doorway.
+    public static func publishGroupEvent(
+        correlationId: String,
+        group: (hostRelayUrl: String, localId: String),
+        kind: UInt32,
+        content: String?,
+        tags: [[String]]?
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let groupHostRelayUrlOffset = fbb.create(string: group.hostRelayUrl)
+        let groupLocalIdOffset = fbb.create(string: group.localId)
+        let groupTableStart = fbb.startTable(with: 2)
+        fbb.add(offset: groupHostRelayUrlOffset, at: 4) // GroupRef slot 0: host_relay_url
+        fbb.add(offset: groupLocalIdOffset, at: 6)       // GroupRef slot 1: local_id
+        let groupOffset = Offset(offset: fbb.endTable(at: groupTableStart))
+        let contentOffset: Offset = content.map { fbb.create(string: $0) } ?? Offset()
+        let tagsOffset: Offset = {
+            guard let tagRows = tags, !tagRows.isEmpty else { return Offset() }
+            var tagOffsets: [Offset] = []
+            for row in tagRows {
+                let valOffsets = row.map { fbb.create(string: $0) }
+                let valsVec = fbb.createVector(ofOffsets: valOffsets)
+                let tagStart = fbb.startTable(with: 1)
+                fbb.add(offset: valsVec, at: 4) // StringTag slot 0: values
+                tagOffsets.append(Offset(offset: fbb.endTable(at: tagStart)))
+            }
+            return fbb.createVector(ofOffsets: tagOffsets)
+        }()
+        let payloadStart = fbb.startTable(with: 5)
+        fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(offset: groupOffset, at: 6) // slot 1: group
+        fbb.add(element: UInt32(kind), def: UInt32(0), at: 8) // slot 2: kind
+        if contentOffset.o != 0 { fbb.add(offset: contentOffset, at: 10) } // slot 3: content
+        if tagsOffset.o != 0 { fbb.add(offset: tagsOffset, at: 12) } // slot 4: tags
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "N29G")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.nip29.publish_group_event",
+            payload: payload
+        )
+    }
+
+    /// Request membership in a NIP-29 group.
+    /// Builds the `nmp.nip29.join` `DispatchEnvelope` bytes for the byte doorway.
+    public static func joinGroup(
+        correlationId: String,
+        group: (hostRelayUrl: String, localId: String),
+        inviteCode: String?,
+        reason: String?
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let groupHostRelayUrlOffset = fbb.create(string: group.hostRelayUrl)
+        let groupLocalIdOffset = fbb.create(string: group.localId)
+        let groupTableStart = fbb.startTable(with: 2)
+        fbb.add(offset: groupHostRelayUrlOffset, at: 4) // GroupRef slot 0: host_relay_url
+        fbb.add(offset: groupLocalIdOffset, at: 6)       // GroupRef slot 1: local_id
+        let groupOffset = Offset(offset: fbb.endTable(at: groupTableStart))
+        let inviteCodeOffset: Offset = inviteCode.map { fbb.create(string: $0) } ?? Offset()
+        let reasonOffset: Offset = reason.map { fbb.create(string: $0) } ?? Offset()
+        let payloadStart = fbb.startTable(with: 4)
+        fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(offset: groupOffset, at: 6) // slot 1: group
+        if inviteCodeOffset.o != 0 { fbb.add(offset: inviteCodeOffset, at: 8) } // slot 2: inviteCode
+        if reasonOffset.o != 0 { fbb.add(offset: reasonOffset, at: 10) } // slot 3: reason
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "N29J")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.nip29.join",
+            payload: payload
+        )
+    }
+
+    /// Create a new public NIP-29 group.
+    /// Builds the `nmp.nip29.create_public_group` `DispatchEnvelope` bytes for the byte doorway.
+    public static func createPublicGroup(
+        correlationId: String,
+        group: (hostRelayUrl: String, localId: String),
+        name: String,
+        about: String?,
+        picture: String?,
+        visibility: Int8,
+        access: Int8,
+        parent: String?
+    ) -> [UInt8] {
+        var fbb = FlatBufferBuilder()
+        let groupHostRelayUrlOffset = fbb.create(string: group.hostRelayUrl)
+        let groupLocalIdOffset = fbb.create(string: group.localId)
+        let groupTableStart = fbb.startTable(with: 2)
+        fbb.add(offset: groupHostRelayUrlOffset, at: 4) // GroupRef slot 0: host_relay_url
+        fbb.add(offset: groupLocalIdOffset, at: 6)       // GroupRef slot 1: local_id
+        let groupOffset = Offset(offset: fbb.endTable(at: groupTableStart))
+        let nameOffset = fbb.create(string: name)
+        let aboutOffset: Offset = about.map { fbb.create(string: $0) } ?? Offset()
+        let pictureOffset: Offset = picture.map { fbb.create(string: $0) } ?? Offset()
+        let parentOffset: Offset = parent.map { fbb.create(string: $0) } ?? Offset()
+        let payloadStart = fbb.startTable(with: 8)
+        fbb.add(element: UInt32(1), def: UInt32(0), at: 4) // slot 0: schema_version
+        fbb.add(offset: groupOffset, at: 6) // slot 1: group
+        fbb.add(offset: nameOffset, at: 8) // slot 2: name
+        if aboutOffset.o != 0 { fbb.add(offset: aboutOffset, at: 10) } // slot 3: about
+        if pictureOffset.o != 0 { fbb.add(offset: pictureOffset, at: 12) } // slot 4: picture
+        fbb.add(element: visibility, def: Int8(0), at: 14) // slot 5: visibility
+        fbb.add(element: access, def: Int8(0), at: 16) // slot 6: access
+        if parentOffset.o != 0 { fbb.add(offset: parentOffset, at: 18) } // slot 7: parent
+        let payloadRoot = Offset(offset: fbb.endTable(at: payloadStart))
+        fbb.finish(offset: payloadRoot, fileId: "N29P")
+        let payload = fbb.sizedByteArray
+        return encodeDispatchEnvelope(
+            correlationId: correlationId,
+            actionNamespace: "nmp.nip29.create_public_group",
+            payload: payload
+        )
+    }
+
     /// Sign-and-publish an arbitrary event kind (generic publish path; NIP-65 outbox or explicit relays).
     /// Builds the `nmp.publish` `DispatchEnvelope` bytes (body `PublishRaw`) for the byte doorway.
     public static func publishRaw(

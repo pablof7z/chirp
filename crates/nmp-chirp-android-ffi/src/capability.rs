@@ -47,8 +47,8 @@
 
 use std::sync::Mutex;
 
-use jni::JavaVM;
 use jni::objects::GlobalRef;
+use jni::JavaVM;
 use nmp_core::__ffi_internal::capability_error_envelope;
 
 /// A Kotlin object implementing `fun handle(requestJson: String): String`.

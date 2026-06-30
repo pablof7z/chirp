@@ -73,36 +73,37 @@ extension KernelHandle {
         registerChirpProjection()
     }
 
+    /// Claim the tailing interest for `eventID`'s visible relations.
+    ///
+    /// Uses the typed byte doorway (`nmp_app_dispatch_action_bytes`, #2170):
+    /// lifecycle `0` = `VisibleNoteRelationsLifecycle::Claim`.
     func claimVisibleNoteRelations(eventID: String) {
-        dispatchVisibleNoteRelations(op: "claim", eventID: eventID)
+        let id = UUID().uuidString
+        let bytes = GeneratedActionBuilders.visibleNoteRelations(
+            correlationId: id,
+            lifecycle: 0,
+            targetEventId: eventID,
+            targetKind: 1,
+            consumerId: "ios.visible-note:\(eventID)",
+            targetAddress: nil
+        )
+        _ = dispatchBytes(bytes)
     }
 
+    /// Release the tailing interest for `eventID`'s visible relations.
+    ///
+    /// Uses the typed byte doorway (`nmp_app_dispatch_action_bytes`, #2170):
+    /// lifecycle `1` = `VisibleNoteRelationsLifecycle::Release`.
     func releaseVisibleNoteRelations(eventID: String) {
-        dispatchVisibleNoteRelations(op: "release", eventID: eventID)
-    }
-
-    private func dispatchVisibleNoteRelations(op: String, eventID: String) {
-        let body: [String: String] = [
-            "op": op,
-            "event_id": eventID,
-            "consumer_id": "ios.visible-note:\(eventID)"
-        ]
-        guard
-            JSONSerialization.isValidJSONObject(body),
-            let data = try? JSONSerialization.data(withJSONObject: body),
-            let json = String(data: data, encoding: .utf8)
-        else { return }
-        dispatchVisibleNoteRelations(bodyJson: json)
-    }
-
-    private func dispatchVisibleNoteRelations(bodyJson: String) {
-        let namespace = "nmp.nip01.visible_note_relations"
-        bodyJson.withCString { jsonPtr in
-            namespace.withCString { nsPtr in
-                if let ptr = nmp_app_chirp_dispatch_action_bytes(raw, nsPtr, jsonPtr) {
-                    nmp_free_string(ptr)
-                }
-            }
-        }
+        let id = UUID().uuidString
+        let bytes = GeneratedActionBuilders.visibleNoteRelations(
+            correlationId: id,
+            lifecycle: 1,
+            targetEventId: eventID,
+            targetKind: 1,
+            consumerId: "ios.visible-note:\(eventID)",
+            targetAddress: nil
+        )
+        _ = dispatchBytes(bytes)
     }
 }

@@ -3,8 +3,8 @@
 //! Factored out of `session.rs` to keep that file under the 500-LOC ceiling.
 //! (AGENTS.md §File-Size)
 
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex};
 
 /// Holds the delivery channels for kernel update frames.
 ///

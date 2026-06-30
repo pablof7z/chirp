@@ -30,11 +30,11 @@ use jni::objects::{JClass, JObject, JString};
 use jni::sys::jlong;
 use jni::JNIEnv;
 
-use nmp_core::__ffi_internal::capability_error_envelope;
-use nmp_ffi::{
+use nmp_app_chirp::ffi::{
     nmp_app_deliver_external_signer_response, nmp_app_set_capability_callback,
     nmp_app_signin_nip55, nmp_external_signer_init, NmpApp,
 };
+use nmp_core::__ffi_internal::capability_error_envelope;
 
 use crate::{jstring_to_cstring, session_arc};
 
@@ -56,7 +56,11 @@ pub(crate) fn install(app: *mut NmpApp, handle: jlong) {
         size_of::<usize>() >= size_of::<jlong>(),
         "jlong→usize truncation: target is 32-bit, handle id would be corrupted"
     );
-    nmp_app_set_capability_callback(app, handle as usize as *mut c_void, Some(on_capability_request));
+    nmp_app_set_capability_callback(
+        app,
+        handle as usize as *mut c_void,
+        Some(on_capability_request),
+    );
     nmp_external_signer_init(app);
 }
 
@@ -78,15 +82,21 @@ extern "C" fn on_capability_request(
         .into_owned();
 
     let parsed: serde_json::Value = serde_json::from_str(&request).unwrap_or_default();
-    let namespace = parsed.get("namespace").and_then(|v| v.as_str()).unwrap_or("");
+    let namespace = parsed
+        .get("namespace")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     if namespace != EXTERNAL_SIGNER_NAMESPACE {
         // Route all non-external_signer namespaces to the registered
         // synchronous capability handler (e.g. Android Keystore keyring).
         // The trampoline context is the registry handle id.
         let handle = context as usize as jlong;
         if let Some(session) = session_arc(handle) {
-            let result = crate::capability::call_sync_handler(&session.capability_handler, &request)
-                .unwrap_or_else(|| capability_error_envelope(&request, "no-capability-handler"));
+            let result =
+                crate::capability::call_sync_handler(&session.capability_handler, &request)
+                    .unwrap_or_else(|| {
+                        capability_error_envelope(&request, "no-capability-handler")
+                    });
             return to_c_string(result);
         }
         return to_c_string(capability_error_envelope(&request, "session-closed"));

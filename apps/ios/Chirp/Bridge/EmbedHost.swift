@@ -20,7 +20,7 @@ struct ClaimedEventDto: Decodable, Equatable {
 /// Issue #1283 Phase 1: the kind-dispatch + tag/JSON parsing that used to live in
 /// this file (`resolve()` / `parseProfileMetadata` / `extractTopLevelMedia`) is
 /// DELETED. The Rust resolver (`nmp_content::resolve_embed_projection`, invoked by
-/// the `nmp-ffi` `refs.event.envelopes` sidecar producer) does that work on the
+/// the Chirp-owned `refs.event.envelopes` sidecar producer) does that work on the
 /// kernel side and ships the result as a typed `NEMB` FlatBuffer. Chirp now
 /// decodes that sidecar (`TypedRefEventEnvelopesDecoder` →
 /// `TypedProjectionGlue.refEventEnvelopes`) into `[String: EmbeddedEventEnvelope]`

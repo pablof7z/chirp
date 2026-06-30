@@ -19,7 +19,6 @@ pub fn execute(input: &str, state: &mut AppState, runtime: &AppRuntime) {
         ("zap", rest) => zap(rest, runtime),
         ("dm", rest) => dm(rest, runtime),
         ("group", rest) => group(rest, runtime),
-        ("mls", rest) => mls(rest, runtime),
         ("search", rest) => search(rest, state, runtime),
         ("outbox", rest) => outbox(rest, runtime),
         ("tab", rest) => tab(rest, state),
@@ -74,7 +73,7 @@ impl ZapCommandRuntime for AppRuntime {
 
 fn help_text() -> Result<CommandResult, String> {
     Ok(CommandResult::Status(
-        "commands: account profile relay dm-relays wallet zap dm group mls search outbox tab"
+        "commands: account profile relay dm-relays wallet zap dm group search outbox tab"
             .to_string(),
     ))
 }
@@ -86,7 +85,7 @@ fn account(rest: &str, runtime: &AppRuntime) -> Result<CommandResult, String> {
             let (name, relay_args) = first_word(args);
             require(name, "account create <name> [relay...]")?;
             let relays = words(relay_args);
-            runtime.create_account(name, &relays, true)?;
+            runtime.create_account(name, &relays, false)?;
             Ok(status(format!("create account requested for {name}")))
         }
         "import" => {
@@ -94,12 +93,6 @@ fn account(rest: &str, runtime: &AppRuntime) -> Result<CommandResult, String> {
             require(nsec, "account import <nsec>")?;
             runtime.sign_in_nsec(nsec)?;
             Ok(status("nsec sign-in requested"))
-        }
-        "import-mls" => {
-            let nsec = args.trim();
-            require(nsec, "account import-mls <nsec>")?;
-            runtime.sign_in_nsec_with_marmot(nsec)?;
-            Ok(status("nsec sign-in + Marmot init requested"))
         }
         "bunker" => {
             let uri = args.trim();
@@ -124,7 +117,10 @@ fn account(rest: &str, runtime: &AppRuntime) -> Result<CommandResult, String> {
             runtime.remove_account(id)?;
             Ok(status(format!("remove account requested for {id}")))
         }
-        _ => Err("usage: account create|import|import-mls|bunker|nostrconnect|cancel-bunker|switch|remove".to_string()),
+        _ => Err(
+            "usage: account create|import|bunker|nostrconnect|cancel-bunker|switch|remove"
+                .to_string(),
+        ),
     }
 }
 
@@ -288,29 +284,6 @@ fn group(rest: &str, runtime: &AppRuntime) -> Result<CommandResult, String> {
     }
 }
 
-fn mls(rest: &str, runtime: &AppRuntime) -> Result<CommandResult, String> {
-    let (verb, args) = first_word(rest);
-    match verb {
-        "init" => {
-            runtime.marmot_register_active()?;
-            Ok(status("Marmot MLS registered for active account"))
-        }
-        "snapshot" => Ok(status(format!(
-            "mls {}",
-            truncate(&runtime.marmot_snapshot_text()?)
-        ))),
-        "dispatch" => {
-            let action: Value = serde_json::from_str(args.trim())
-                .map_err(|e| format!("mls dispatch JSON parse failed: {e}"))?;
-            Ok(status(format!(
-                "mls {}",
-                truncate(&runtime.marmot_dispatch_json(action)?)
-            )))
-        }
-        _ => Err("usage: mls init|snapshot|dispatch <json>".to_string()),
-    }
-}
-
 fn search(rest: &str, state: &mut AppState, runtime: &AppRuntime) -> Result<CommandResult, String> {
     let (kind, value) = first_word(rest);
     require(value, "search profile|thread|tag <value>")?;
@@ -410,15 +383,6 @@ fn action(correlation_id: String, label: &str) -> CommandResult {
     CommandResult::Action {
         correlation_id,
         label: label.to_string(),
-    }
-}
-
-fn truncate(value: &str) -> String {
-    let compact = value.replace('\n', " ");
-    if compact.chars().count() <= 120 {
-        compact
-    } else {
-        format!("{}...", compact.chars().take(117).collect::<String>())
     }
 }
 

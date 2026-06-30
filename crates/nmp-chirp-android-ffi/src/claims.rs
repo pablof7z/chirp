@@ -12,11 +12,11 @@
 //! the claim ledger and resolution; these entrypoints forward strings and
 //! return void. D6: a null/dead handle or a malformed string is a silent no-op.
 
-use jni::JNIEnv;
 use jni::objects::{JClass, JString};
 use jni::sys::jlong;
+use jni::JNIEnv;
 
-use nmp_ffi::{
+use nmp_app_chirp::ffi::{
     nmp_app_release_event_ref, nmp_app_resolve_event_embed_with_metadata, nmp_nip21_decode_uri,
 };
 
@@ -43,7 +43,7 @@ fn event_ref_from_uri(uri: &std::ffi::CStr) -> Option<EventRefFromUri> {
         .to_str()
         .ok()
         .map(str::to_owned);
-    nmp_ffi::nmp_free_string(raw);
+    nmp_app_chirp::ffi::nmp_free_string(raw);
 
     let s = s?;
     let v: serde_json::Value = serde_json::from_str(&s).ok()?;

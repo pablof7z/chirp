@@ -26,29 +26,6 @@ private const val TAG = "MarmotActions"
 class MarmotActions(
     private val dispatchBytes: (bytes: ByteArray) -> DispatchResult,
 ) {
-    /** Account this instance last registered a Marmot identity for. */
-    private var registeredAccount: String? = null
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Registration
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Register a Marmot MLS identity against the active local account,
-     * idempotent per account. [dbDir] is the host app-support directory (e.g.
-     * `context.filesDir.path`). No-op when there is no active account yet, or
-     * when already registered for the current account. Returns true when the
-     * Rust side confirmed registration.
-     *
-     * Called by [KernelModel.registerMarmotIfNeeded] — not directly by UI.
-     */
-    internal fun registerIfNeeded(activeAccount: String, dbDir: String, bridge: KernelBridge): Boolean {
-        if (activeAccount.isEmpty() || activeAccount == registeredAccount) return false
-        val ok = bridge.marmotRegisterActive(dbDir)
-        if (ok) registeredAccount = activeAccount
-        return ok
-    }
-
     // ─────────────────────────────────────────────────────────────────────────
     // Write operations (one generated builder per op)
     // ─────────────────────────────────────────────────────────────────────────

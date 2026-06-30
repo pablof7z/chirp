@@ -8,9 +8,9 @@
 //!
 //! ## Wiring
 //!
-//! The iOS shell links this one aggregate static library for Chirp. Keeping
-//! `nmp-ffi`, the NIP-46 broker adapter, and the Chirp projection in one Rust
-//! archive gives the process exactly one copy of the native C-ABI state.
+//! The iOS shell links this one aggregate static library for Chirp. Chirp owns
+//! the C ABI symbols its shells call; `nmp-native-runtime` owns the runtime
+//! state behind those symbols.
 //!
 //! The shell calls [`nmp_signer_broker_init`] once after `nmp_app_new` and
 //! checks for `NmpConfigStatus::Ok`, then calls [`ffi::nmp_app_chirp_register`].
@@ -70,10 +70,13 @@ pub use action_specs::{
     unfollow_spec, zap_identifier_spec, zap_spec, TypedActionSpec,
 };
 pub use dispatch_bytes::{dispatch_action_bytes_for, mint_correlation_id, parse_dispatch_envelope};
+pub use nmp_native_runtime::{NmpApp, NmpConfigStatus};
 pub use zap_identifier::{ZapIdentifierInput, ZAP_IDENTIFIER_NAMESPACE};
 // The raw `(namespace, body_json)` byte doorway for direct-dispatch sites
 // (NIP-29 group ops, #2170). M14-1 / #2145.
 pub use ffi::nmp_app_chirp_dispatch_action_bytes;
+pub use ffi::GroupFeedHandle;
+pub use ffi::{nmp_app_cancel_bunker_handshake, nmp_app_nostrconnect_uri, nmp_signer_broker_init};
 pub use ffi::{
     nmp_app_chirp_close_group_discovery,
     nmp_app_chirp_close_tag_feed,
@@ -82,9 +85,6 @@ pub use ffi::{
     // #1740 step 7 — the ONE public app-facing feed doorway.
     nmp_app_close_feed,
     nmp_app_open_feed,
-};
-pub use nmp_ffi::{
-    nmp_app_cancel_bunker_handshake, nmp_app_nostrconnect_uri, nmp_signer_broker_init,
 };
 pub use nmp_nip01::{
     Nip10ReplyAttribution as ChirpReplyAttribution, TimelineEventCard as ChirpEventCard,
@@ -110,46 +110,7 @@ pub use typed_api::{
 /// `nmp_nip01::op_feed::OpFeedSnapshot` — no app name in a framework type alias.
 pub type OpFeedSnapshot = nmp_feed::RootFeedSnapshot<ChirpEventCard, ChirpReplyAttribution>;
 
-// ── Marmot (MLS encrypted groups) projection ─────────────────────────────
-//
-// A second FFI projection over the same kernel substrate. Mirrors the
-// timeline symbols' naming / lifetime / free conventions. The iOS agent
-// links these alongside the timeline symbols.
-//
-// The reusable C-ABI shell lives in the `nmp-marmot` crate
-// (`crates/nmp-marmot/src/ffi.rs` + siblings) so the crate is a standalone
-// buildable target for a future Marmot-only app. Chirp pulls it in via the
-// `nmp-marmot/ffi` feature; the `#[no_mangle] nmp_marmot_*` symbols flow
-// through `libnmp_app_chirp.a` automatically via rlib linkage (iOS still
-// links exactly one staticlib). Chirp-specific identity/keyring wrappers stay
-// in this app crate so `nmp-marmot` does not own Chirp symbol names or
-// keyring account policy.
-//
-// Gated behind the `marmot` feature: MLS-over-Nostr was formally deferred to
-// post-v1. Chirp opts in via its default feature set; a no-default-features
-// build excludes the whole projection (dependency, modules, and FFI symbols).
-#[cfg(feature = "marmot")]
-pub use ffi::{
-    nmp_app_chirp_identity_remove_account, nmp_app_chirp_identity_restore,
-    nmp_app_chirp_identity_sign_in_nsec,
-};
-// #1727: the vestigial `nmp_marmot_fetch_key_packages` C-ABI symbol was
-// deleted — it had no native caller and the same key-package lookup interest
-// is already pushed internally by the invite/group flow.
-// V-107 / ADR-0039: `nmp_marmot_snapshot`, `nmp_marmot_group_messages`, and
-// `nmp_marmot_string_free` were deleted. Swift now reads Marmot state from
-// the push projections (`nmp.marmot.snapshot` / `nmp.marmot.messages`) on
-// the SnapshotFrame instead. Only the lifecycle symbols remain exported here.
-// #1727: `nmp_marmot_register` (secret-bearing) is no longer a C-ABI symbol —
-// it became a plain Rust fn (`nmp_marmot::ffi::register_with_secret_hex`) used
-// only Rust-side by the nsec sign-in wrapper. No native-facing `nmp_marmot_*`
-// symbol carries secret key material; native registers via `register_active`,
-// which reads the actor-owned `mls_local_nsec` slot.
-#[cfg(feature = "marmot")]
-pub use nmp_marmot::ffi::{nmp_marmot_register_active, nmp_marmot_unregister, MarmotHandle};
-#[cfg(feature = "marmot")]
-pub use nmp_marmot::projection::payload::{
-    KeyPackageStatus, MarmotGroupRow, MarmotMessageRow, MarmotSnapshot, PendingWelcomeRow,
-};
-#[cfg(feature = "marmot")]
-pub use nmp_marmot::projection::state::MarmotProjection;
+// Marmot's C lifecycle shell was removed from NMP. Chirp no longer re-exports
+// `nmp_marmot_*` or `nmp_app_chirp_identity_*` symbols here; any future MLS
+// integration must install the current `nmp-marmot` action/projection runtime
+// through a Rust-owned composition API, not through a resurrected handle bundle.

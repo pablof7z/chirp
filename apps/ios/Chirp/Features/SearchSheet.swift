@@ -9,10 +9,10 @@ import SwiftUI
 /// `nmp_app_search_snapshot` pull), and (3) decodes the typed `N50S` FlatBuffers
 /// sidecar via `SearchResultsDecoder`.
 ///
-/// Query validation, relay selection (UserPreferred → the active account's
-/// kind:10007 list, wired transitively by `register_defaults`), the local
-/// cache-FTS scan, dedup, and result ordering all live in NMP/Rust. Results
-/// include both local cache hits and relay hits.
+/// Query validation, relay selection (UserPreferred -> the active account's
+/// kind:10007 list, wired by Chirp's explicit NMP owner-crate composition), the
+/// local cache-FTS scan, dedup, and result ordering all live in NMP/Rust.
+/// Results include both local cache hits and relay hits.
 ///
 /// The controller owns one search session id for its lifetime; submitting a new
 /// query re-opens search under the SAME session id (the kernel replaces the

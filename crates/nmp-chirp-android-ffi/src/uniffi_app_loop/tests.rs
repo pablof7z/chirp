@@ -25,7 +25,12 @@ struct CaptureSink {
 impl CaptureSink {
     fn new() -> (Self, Arc<Mutex<Vec<Vec<u8>>>>) {
         let inner = Arc::new(Mutex::new(Vec::<Vec<u8>>::new()));
-        (Self { inner: Arc::clone(&inner) }, inner)
+        (
+            Self {
+                inner: Arc::clone(&inner),
+            },
+            inner,
+        )
     }
 }
 
@@ -91,7 +96,10 @@ fn send_frame_via_generic_sink(session: &Arc<Session>, frame: &[u8]) {
 #[test]
 fn set_update_sink_receives_frame_bytes_unchanged() {
     let session = Session::inert_session();
-    let handle = Arc::new(AppHandle { session: Arc::clone(&session), handle: 0 });
+    let handle = Arc::new(AppHandle {
+        session: Arc::clone(&session),
+        handle: 0,
+    });
 
     let (sink, captured) = CaptureSink::new();
     handle.set_update_sink(Box::new(sink));
@@ -107,7 +115,10 @@ fn set_update_sink_receives_frame_bytes_unchanged() {
 #[test]
 fn clear_update_sink_stops_delivery() {
     let session = Session::inert_session();
-    let handle = Arc::new(AppHandle { session: Arc::clone(&session), handle: 0 });
+    let handle = Arc::new(AppHandle {
+        session: Arc::clone(&session),
+        handle: 0,
+    });
 
     let (sink, captured) = CaptureSink::new();
     handle.set_update_sink(Box::new(sink));
@@ -130,9 +141,15 @@ fn dispatch_action_bytes_returns_error_on_inert_handle() {
         handle: 0,
     });
     let ack = handle.dispatch_action_bytes(b"NMPD\x00\x00garbage".to_vec());
-    assert!(ack.correlation_id.is_none(), "inert handle must not produce a correlation_id");
+    assert!(
+        ack.correlation_id.is_none(),
+        "inert handle must not produce a correlation_id"
+    );
     assert!(ack.error.is_some(), "inert handle must produce an error");
-    assert!(!ack.error.unwrap().is_empty(), "error message must be non-empty");
+    assert!(
+        !ack.error.unwrap().is_empty(),
+        "error message must be non-empty"
+    );
 }
 
 #[test]
@@ -173,7 +190,10 @@ fn parse_dispatch_ack_malformed_json_returns_error() {
 #[test]
 fn callback_panic_is_contained_does_not_abort() {
     let session = Session::inert_session();
-    let handle = Arc::new(AppHandle { session: Arc::clone(&session), handle: 0 });
+    let handle = Arc::new(AppHandle {
+        session: Arc::clone(&session),
+        handle: 0,
+    });
     handle.set_update_sink(Box::new(PanickingSink));
 
     // Should NOT panic / abort the test process — catch_unwind in the
@@ -195,10 +215,13 @@ fn quiescence_clear_does_not_return_while_callback_in_flight() {
     //    the old (blocking) sink does NOT.
     //
     // The live kernel Condvar quiescence (nmp_app_set_update_callback(None)
-    // blocking until in-flight on_update returns) is tested by nmp-ffi;
+    // blocking until in-flight on_update returns) is tested by nmp-app-chirp;
     // here we verify only the generic_sink slot ordering.
     let session = Session::inert_session();
-    let handle = Arc::new(AppHandle { session: Arc::clone(&session), handle: 0 });
+    let handle = Arc::new(AppHandle {
+        session: Arc::clone(&session),
+        handle: 0,
+    });
 
     let (tx, rx) = std::sync::mpsc::sync_channel::<()>(0);
     let blocking = BlockingSink::new(tx);
@@ -207,13 +230,12 @@ fn quiescence_clear_does_not_return_while_callback_in_flight() {
     // Inject blocking logic directly into the generic_sink slot, bypassing
     // `set_update_sink` (which requires `Box<dyn UpdateSink>`, not Arc).
     // The closure mirrors what `set_update_sink` builds (with catch_unwind).
-    let update_fn: Arc<dyn Fn(Vec<u8>) + Send + Sync> =
-        Arc::new(move |bytes: Vec<u8>| {
-            let s = Arc::clone(&blocking_ref);
-            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
-                s.on_update(bytes);
-            }));
-        });
+    let update_fn: Arc<dyn Fn(Vec<u8>) + Send + Sync> = Arc::new(move |bytes: Vec<u8>| {
+        let s = Arc::clone(&blocking_ref);
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            s.on_update(bytes);
+        }));
+    });
     session.set_generic_sink(update_fn);
 
     // Thread: fire the generic sink (enters blocking on_update)

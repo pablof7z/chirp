@@ -23,8 +23,6 @@
 //! * **external_signer.rs**: `nativeSignInNip55`, `nativeDeliverSignerResponse`,
 //!   `nativeSetSignerRequestListener`, `nativeClearSignerRequestListener`
 //! * **capability.rs**: `nativeSetCapabilityHandler`
-//! * **identity.rs**: `nativeIdentityRestore`
-//! * **marmot.rs**: `nativeMarmotRegisterActive`, `nativeMarmotUnregister`
 //! * **lib.rs**: `nativeSeedRelays`, `nativeSignInNsec`, `nativeSwitchAccount`,
 //!   `nativeRemoveAccount`, `nativeCreateLocalAccount`, `nativeAddRelay`,
 //!   `nativeRemoveRelay`, `nativeEncodeProfile`
@@ -53,13 +51,13 @@
 use std::ffi::CStr;
 use std::sync::Arc;
 
+use nmp_app_chirp::ffi::{
+    nmp_app_declare_incremental_apply, nmp_app_dispatch_action_bytes, nmp_app_free, nmp_app_new,
+    nmp_app_start, nmp_app_stop, nmp_free_string, NmpConfigStatus,
+};
 use nmp_app_chirp::{
     dispatch_action_bytes_for, nmp_app_chirp_declare_consumed_projections, nmp_app_chirp_register,
     nmp_signer_broker_init, NmpRegisterStatus,
-};
-use nmp_ffi::{
-    nmp_app_declare_incremental_apply, nmp_app_dispatch_action_bytes, nmp_app_free, nmp_app_new,
-    nmp_app_start, nmp_app_stop, nmp_free_string, NmpConfigStatus,
 };
 
 use crate::external_signer;
@@ -103,7 +101,7 @@ pub trait UpdateSink: Send + Sync {
 /// ## `legacy_jni_session_id()`
 ///
 /// Returns the internal session registry id used by residual JNI lanes
-/// (signer, capability, marmot, identity). It is NOT permission to use
+/// (signer and capability). It is NOT permission to use
 /// this id for app-loop operations from new Kotlin code.
 #[derive(uniffi::Object)]
 pub struct AppHandle {
@@ -138,7 +136,8 @@ impl AppHandle {
     /// `visible_limit`: max items in the visible window (0 = kernel default).
     /// `emit_hz`: update emission rate in Hz (0 = kernel default, max 12).
     pub fn start(&self, visible_limit: u32, emit_hz: u32) {
-        self.session.with_app(|app| nmp_app_start(app, visible_limit, emit_hz));
+        self.session
+            .with_app(|app| nmp_app_start(app, visible_limit, emit_hz));
     }
 
     /// Stop the kernel event loop.
@@ -157,9 +156,9 @@ impl AppHandle {
     /// already produce encoded action envelopes should use this over the
     /// legacy JSON adapters below.
     pub fn dispatch_action_bytes(&self, bytes: Vec<u8>) -> DispatchAck {
-        let result_ptr = self.session.with_app(|app| {
-            nmp_app_dispatch_action_bytes(app, bytes.as_ptr(), bytes.len())
-        });
+        let result_ptr = self
+            .session
+            .with_app(|app| nmp_app_dispatch_action_bytes(app, bytes.as_ptr(), bytes.len()));
         match result_ptr {
             None => DispatchAck {
                 correlation_id: None,
@@ -172,7 +171,9 @@ impl AppHandle {
             Some(ptr) => {
                 // SAFETY: nmp_app_dispatch_action_bytes returns a heap-allocated
                 // NUL-terminated C string.  nmp_free_string is the canonical free.
-                let json = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+                let json = unsafe { CStr::from_ptr(ptr) }
+                    .to_string_lossy()
+                    .into_owned();
                 nmp_free_string(ptr);
                 parse_dispatch_ack(&json)
             }
@@ -182,8 +183,7 @@ impl AppHandle {
     /// Dispatch from a `(namespace, body_json)` pair.
     ///
     /// JSON adapter for namespaces that pre-date the FlatBuffers write boundary:
-    /// kept as a RESIDUAL for the Marmot hybrid builder path (#2169) and the
-    /// terminal-UI (TUI) consumer. The intent/action-spec path is GONE (M14-1 /
+    /// kept for the terminal-UI (TUI) consumer. The intent/action-spec path is GONE (M14-1 /
     /// #2145); all Chirp social write verbs use `dispatch_action_bytes` with
     /// generated builders. Routes through the same typed byte doorway
     /// (`nmp_app_dispatch_action_bytes`) as `dispatch_action_bytes`.
@@ -215,7 +215,7 @@ impl AppHandle {
         let update_fn: Arc<dyn Fn(Vec<u8>) + Send + Sync> = Arc::new(move |bytes: Vec<u8>| {
             let s = sink_arc.clone();
             // catch_unwind: a panicking Kotlin callback must not unwind through
-            // the C callback boundary (undefined behaviour in nmp-ffi).
+            // the C callback boundary (undefined behaviour across any FFI).
             let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
                 s.on_update(bytes);
             }));
@@ -267,9 +267,8 @@ impl AppHandle {
 
     /// Session registry id for residual JNI lanes.
     ///
-    /// Returns the `jlong` handle that signer, capability, marmot, and
-    /// identity JNI functions use to look up the kernel session. NOT for
-    /// app-loop operations.
+    /// Returns the `jlong` handle that signer and capability JNI functions use
+    /// to look up the kernel session. NOT for app-loop operations.
     pub fn legacy_jni_session_id(&self) -> i64 {
         self.handle
     }

@@ -27,7 +27,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.nmp.android.DispatchResult
@@ -57,15 +56,7 @@ import org.nmp.android.model.MarmotSnapshot
  */
 @Composable
 fun GroupsScreen(model: KernelModel, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
     val s by model.state.collectAsStateWithLifecycle()
-    val activeAccount = s.activeAccount
-
-    LaunchedEffect(activeAccount) {
-        if (activeAccount.isNotEmpty()) {
-            model.registerMarmotIfNeeded(context.filesDir.path)
-        }
-    }
 
     val snapshot = s.projections?.marmotSnapshot ?: MarmotSnapshot()
     val messagesByGroup = s.projections?.marmotMessages ?: emptyMap()

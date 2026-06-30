@@ -1,11 +1,9 @@
 //! Chirp-specific action-registration helper invoked from
 //! [`super::register::nmp_app_chirp_register`].
 //!
-//! `super::register::nmp_app_chirp_register` calls
-//! `nmp_defaults::register_defaults` for the canonical NMP action
-//! modules (NIP-02 / NIP-17 / NIP-57 / NIP-65) and the production routing
-//! substrate; this file owns the **Chirp-specific** registration that the
-//! template intentionally does not ship.
+//! `super::register::nmp_app_chirp_register` wires the reusable NMP owner
+//! crates explicitly; this file owns the **Chirp-specific** registration that a
+//! generic NMP app would not ship.
 //!
 //! Today: NIP-29 (relay-based group chat) plus Chirp's raw-identifier zap
 //! composition action. A notes-only or DM-only Nostr app on top of NMP would not
@@ -16,16 +14,15 @@
 //! Pre-step-10 this file also held `register_chirp_actions` (NIP-02 +
 //! NIP-25), `register_nip17_actions`, `register_nip57_actions`, and
 //! `register_nip65_actions`. Those wrappers were each a one-line forward
-//! to the corresponding NIP crate's `register_actions`; they all moved
-//! into `nmp_defaults::register_defaults` so a second NMP-based app
-//! inherits them through one call rather than re-copying five lines.
+//! to the corresponding NIP crate's registration API. The app root now names
+//! those owner crates directly during explicit composition.
 //!
 //! The bespoke C-ABI symbols (`nmp_app_react` / `nmp_app_follow` /
 //! `nmp_app_unfollow`) had been deleted in a prior cycle; the only door
 //! into the social verbs is `nmp_app_dispatch_action` under the
 //! `nmp.follow` / `nmp.unfollow` / `nmp.nip25.react` namespaces.
 
-use nmp_ffi::NmpApp;
+use nmp_native_runtime::NmpApp;
 
 /// Register the NIP-29 group-chat action namespaces against `app`'s
 /// action registry.
@@ -37,9 +34,8 @@ use nmp_ffi::NmpApp;
 /// can be reached through the generic `dispatch_action` path without
 /// `nmp-core` learning any NIP-29 group nouns (D0).
 ///
-/// Namespaces: `nmp.nip29.publish_group_event`, `nmp.nip29.react_in_group`,
-/// `nmp.nip29.create_public_group`, `nmp.nip29.discover`,
-/// `nmp.nip29.join`.
+/// Namespaces: `nmp.nip29.publish_group_event`,
+/// `nmp.nip29.create_public_group`, `nmp.nip29.discover`, `nmp.nip29.join`.
 ///
 /// SCOPE: NIP-29 v1 ships public group creation, generic group-event publishing,
 /// discovery, and join. The remaining admin / membership executors are

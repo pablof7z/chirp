@@ -3,17 +3,17 @@
 //! Registration wiring proofs (group-chat + discovery lifecycle) live in the
 //! sibling `nip29_registration` module to keep each file under the 500-LOC cap.
 
+use super::super::{nmp_app_free, nmp_app_new};
 use nmp_core::actor::ActorCommand;
 use nmp_core::actor::{ActionLedgerCommand, InterestsCommand, PublishCommand};
+use nmp_core::publish::PublishRouteClass;
 use nmp_core::substrate::{ActionContext, ActionModule};
-use nmp_ffi::{nmp_app_free, nmp_app_new};
 use nmp_nip29::action::{
     CreatePublicGroupAction, DiscoverGroupsAction, DiscoverGroupsInput, JoinGroupAction,
-    JoinGroupInput, PublishGroupEventAction, PublishGroupEventInput, ReactInGroupAction,
+    JoinGroupInput, PublishGroupEventAction, PublishGroupEventInput,
 };
 use nmp_nip29::group_id::GroupId;
 use nmp_nip29::interest::relay_discovery_identity;
-use nmp_nip29::kinds::KIND_CHAT_MESSAGE;
 
 use super::super::nmp_app_chirp_unregister;
 use super::helpers::{dispatch, register_app, run_module_execute};
@@ -67,14 +67,14 @@ fn nip29_publish_group_event_dispatches_through_action_registry() {
 
 /// THE EXECUTOR PROOF: the NIP-29 generic publish executor maps a validated
 /// `PublishGroupEventInput` to a concrete
-/// [`ActorCommand::PublishUnsignedEventToRelays`] pinned to the group's
+/// owned publish command pinned to the group's
 /// own host relay — proving the `PublishGroupEventAction::execute` typed
 /// path (ADR-0027) produces the right command end-to-end.
 #[test]
 fn nip29_publish_group_event_executor_emits_host_pinned_publish_command() {
     let input = PublishGroupEventInput {
         group: GroupId::new("wss://groups.example.com", "rust-nostr"),
-        kind: KIND_CHAT_MESSAGE,
+        kind: nmp_kinds::KIND_GROUP_CHAT_MESSAGE,
         content: "hello".to_string(),
         tags: vec![],
     };
@@ -92,17 +92,19 @@ fn nip29_publish_group_event_executor_emits_host_pinned_publish_command() {
         .expect("publish-group-event executor must send at least one command");
 
     match cmd {
-        ActorCommand::Publish(PublishCommand::UnsignedEventToRelays {
+        ActorCommand::Publish(PublishCommand::OwnedUnsignedEventToRelays {
             event,
+            route_class,
             relays,
             correlation_id,
             ..
         }) => {
+            assert_eq!(route_class, PublishRouteClass::GroupHostPin);
             // Pinned to EXACTLY the group's host relay — never the
             // author's NIP-65 outbox.
             assert_eq!(relays, vec!["wss://groups.example.com".to_string()]);
             // kind:9 chat message, host-pin `["h", local_id]` tag.
-            assert_eq!(event.kind, KIND_CHAT_MESSAGE);
+            assert_eq!(event.kind, nmp_kinds::KIND_GROUP_CHAT_MESSAGE);
             assert!(
                 event
                     .tags
@@ -120,7 +122,7 @@ fn nip29_publish_group_event_executor_emits_host_pinned_publish_command() {
                 "correlation_id must be threaded through"
             );
         }
-        other => panic!("expected PublishUnsignedEventToRelays, got {other:?}"),
+        other => panic!("expected OwnedUnsignedEventToRelays, got {other:?}"),
     }
 }
 
@@ -142,14 +144,10 @@ fn nip29_all_namespaces_dispatch_through_action_registry() {
     let group = r#"{"host_relay_url":"wss://groups.example.com","local_id":"room"}"#;
     // Each chat/create namespace, with a well-formed body for its typed
     // `<Input>`.
-    let cases: [(&str, String); 3] = [
+    let cases: [(&str, String); 2] = [
         (
             PublishGroupEventAction::NAMESPACE,
             format!(r#"{{"group":{group},"kind":9,"content":"hi"}}"#),
-        ),
-        (
-            ReactInGroupAction::NAMESPACE,
-            format!(r#"{{"group":{group},"target_event_id":"deadbeef","content":"+"}}"#),
         ),
         (
             CreatePublicGroupAction::NAMESPACE,
@@ -353,26 +351,24 @@ fn nip29_join_executor_emits_kind_9021_with_host_pin() {
         .next()
         .expect("join executor must send at least one command");
     match cmd {
-        ActorCommand::Publish(PublishCommand::UnsignedEventToRelays {
+        ActorCommand::Publish(PublishCommand::OwnedUnsignedEventToRelays {
             event,
+            route_class,
             relays,
             correlation_id,
             ..
         }) => {
+            assert_eq!(route_class, PublishRouteClass::GroupHostPin);
             assert_eq!(relays, vec!["wss://groups.example.com".to_string()]);
             assert_eq!(event.kind, 9021);
-            assert!(
-                event
-                    .tags
-                    .iter()
-                    .any(|t| t == &vec!["h".to_string(), "room".to_string()])
-            );
-            assert!(
-                event
-                    .tags
-                    .iter()
-                    .any(|t| t == &vec!["code".to_string(), "abc".to_string()])
-            );
+            assert!(event
+                .tags
+                .iter()
+                .any(|t| t == &vec!["h".to_string(), "room".to_string()]));
+            assert!(event
+                .tags
+                .iter()
+                .any(|t| t == &vec!["code".to_string(), "abc".to_string()]));
             assert_eq!(event.content, "please");
             // correlation_id threads through from the executor.
             assert!(
@@ -380,6 +376,6 @@ fn nip29_join_executor_emits_kind_9021_with_host_pin() {
                 "correlation_id must be threaded through"
             );
         }
-        other => panic!("expected PublishUnsignedEventToRelays, got {other:?}"),
+        other => panic!("expected OwnedUnsignedEventToRelays, got {other:?}"),
     }
 }

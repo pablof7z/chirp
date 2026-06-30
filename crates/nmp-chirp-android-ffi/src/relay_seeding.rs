@@ -11,7 +11,7 @@
 
 use std::ffi::CString;
 
-use nmp_ffi::{nmp_app_add_relay, NmpApp};
+use nmp_app_chirp::ffi::{nmp_app_add_relay, NmpApp};
 
 /// Seed the Chirp reference relay set.
 ///
@@ -73,7 +73,7 @@ mod tests {
     use super::seed_relays_from_json;
     use std::ptr;
 
-    fn null_app() -> *mut nmp_ffi::NmpApp {
+    fn null_app() -> *mut nmp_app_chirp::ffi::NmpApp {
         ptr::null_mut()
     }
 
@@ -106,7 +106,8 @@ mod tests {
 
     #[test]
     fn relay_override_multiple_entries_returns_true() {
-        let json = r#"[["wss://relay.example.com","both"],["wss://indexer.example.com","indexer"]]"#;
+        let json =
+            r#"[["wss://relay.example.com","both"],["wss://indexer.example.com","indexer"]]"#;
         assert!(seed_relays_from_json(null_app(), json));
     }
 
@@ -114,7 +115,10 @@ mod tests {
     fn default_relays_json_array_is_non_empty() {
         let json = super::default_relays_json_array();
         let parsed: Vec<[String; 2]> = serde_json::from_str(&json).expect("valid JSON");
-        assert!(!parsed.is_empty(), "Chirp must have at least one reference relay");
+        assert!(
+            !parsed.is_empty(),
+            "Chirp must have at least one reference relay"
+        );
         for entry in &parsed {
             assert!(!entry[0].is_empty(), "relay URL must not be empty");
             assert!(!entry[1].is_empty(), "relay role must not be empty");

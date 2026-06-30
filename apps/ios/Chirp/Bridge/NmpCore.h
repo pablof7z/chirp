@@ -6,7 +6,7 @@
 
 // Chirp uses the raw C bridge over the NMP kernel actor. This header MUST stay
 // in sync with the non-test-gated `#[no_mangle] extern "C" fn nmp_app_*`
-// symbols exported from `crates/nmp-ffi/src/`. The M14 UniFFI codegen path
+// symbols exported from `crates/nmp-app-chirp/src/ffi/`. The M14 UniFFI codegen path
 // will supersede this; until then it's hand-maintained and verified by the CI gate
 // `ci/check-ffi-header-drift.sh`.
 
@@ -135,7 +135,7 @@ void nmp_app_signin_nsec(void *app, const char *secret, uint8_t make_active);
 void nmp_app_register_agent_nsec(void *app, const char *secret);
 void nmp_app_signin_bunker(void *app, const char *uri, uint8_t make_active);
 // ADR-0048 Stage 2 — NIP-55 external signer (Android-only at runtime; the
-// symbols exist behind nmp-ffi's `external-signer` feature, which the iOS
+// symbols exist behind Chirp's `android-ffi` feature, which the iOS
 // build does not enable — declared here so the header stays the single
 // canonical mirror of the Rust `nmp_app_*` surface).
 // Begin a NIP-55 sign-in routed to `signer_package` (NULL = OS resolver).
@@ -441,7 +441,7 @@ void nmp_app_open_uri(void *app, const char *uri);
 // ── NIP-46 actor-lane runtime ─────────────────────────────────────────────
 //
 // NIP-46 rides the actor's shared relay lane (no separate worker thread / socket).
-// The interceptor + per-app bunker hook live in nmp-ffi and are linked through
+// The interceptor + per-app bunker hook live in nmp-app-chirp and are linked through
 // the aggregate `libnmp_app_chirp.a` archive. State is per-app (ADR-0052 §D3 —
 // no process-global), stored on the NmpApp handle.
 //
@@ -701,7 +701,7 @@ typedef struct NmpMirrorBytes {
 // by min(max_total_raw_bytes, 4 MiB). A null app, unknown cursor, or unavailable
 // store returns a serialized Error variant — never NULL, never a panic (D6).
 // The result encoding (Page / Gap / Error) is documented in
-// `crates/nmp-ffi/src/pull.rs`.
+// `crates/nmp-native-runtime/src/app_mirror`.
 // Renamed nmp_app_pull_page → nmp_mirror_pull_page (#1726).
 struct NmpMirrorBytes nmp_mirror_pull_page(const void *app,
                                            uint64_t cursor_id,

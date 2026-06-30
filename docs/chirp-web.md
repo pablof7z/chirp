@@ -37,8 +37,8 @@ next without reading developer diagnostics.
 
 Chirp's production relay bootstrap is app/operator policy, single-sourced in
 `apps/chirp/crates/nmp-chirp-config`. It is not an NMP framework default and
-must not be duplicated in `nmp-core`, `nmp-defaults`, or `nmp-browser-runtime`. The production default set uses
-`wss://relay.primal.net` with role `"both,indexer"` because current
+must not be duplicated in `nmp-core`, `nmp-substrate`, or `nmp-browser-runtime`.
+The Chirp bootstrap set uses `wss://relay.primal.net` with role `"both,indexer"` because current
 production-browser evidence shows that role shape can keep a connected
 write-capable lane and produce signed kind:1 acceptance, which the first-run
 proof needs for a terminal relay verdict. `wss://purplepag.es` remains role

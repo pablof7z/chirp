@@ -4,18 +4,22 @@
 //! (AGENTS.md). Exported from `ffi/mod.rs` alongside the rest of the
 //! `pub extern "C"` surface.
 //!
-//! ## Thin shell over the `nmp-ffi` composition root (#2088)
+//! ## Thin shell over `nmp-native-runtime` group sessions (#2088)
 //!
-//! These symbols hold ZERO logic: they parse C strings and delegate to the
-//! hydrating `NmpApp::open_group_*` / `close_group_*` methods that live in
-//! `nmp-ffi` (`group_feed.rs`). The composition — register the projection
-//! muted, route ingest through `open_observed_interest_pinned` for read-cache
-//! replay, record a teardown handle — lives there, not here, because it must
-//! name `NmpApp` (the FFI host type `nmp-nip29` may not name, D0).
+//! These symbols parse C strings and delegate to hydrating
+//! `NmpApp::open_nip29_*_session` / `close_nip29_*_session` methods. Chirp owns
+//! only the native ABI lifecycle bookkeeping needed by its fire-and-forget
+//! Swift calls; the session composition stays in `nmp-native-runtime`, and
+//! NIP-29 protocol semantics stay in `nmp-nip29`.
 
+use std::collections::HashMap;
 use std::ffi::c_char;
+use std::sync::Mutex;
 
-use nmp_ffi::{open_group_discovery_handle, GroupFeedHandle, NmpApp};
+use nmp_native_runtime::{
+    Nip29GroupDiscoveryHandle, Nip29GroupDiscoverySession, Nip29GroupEventsHandle,
+    Nip29GroupEventsSession, NmpApp,
+};
 use nmp_nip29::group_id::GroupId;
 use serde::Deserialize;
 
@@ -34,6 +38,47 @@ struct GroupEventsRequest {
     group: GroupId,
     /// The consumer's kind selection. Empty = all; missing = invalid.
     kinds: Vec<u32>,
+}
+
+type AppId = usize;
+
+#[must_use]
+fn app_id(app: *mut NmpApp) -> AppId {
+    app as AppId
+}
+
+static OPEN_GROUP_EVENTS: Mutex<Option<HashMap<AppId, Nip29GroupEventsHandle>>> = Mutex::new(None);
+
+fn remember_group_events(app: *mut NmpApp, handle: Nip29GroupEventsHandle) {
+    if let Ok(mut guard) = OPEN_GROUP_EVENTS.lock() {
+        guard
+            .get_or_insert_with(HashMap::new)
+            .insert(app_id(app), handle);
+    }
+}
+
+fn forget_group_events(app: *mut NmpApp) -> Option<Nip29GroupEventsHandle> {
+    OPEN_GROUP_EVENTS
+        .lock()
+        .ok()
+        .and_then(|mut guard| guard.as_mut().and_then(|map| map.remove(&app_id(app))))
+}
+
+/// Opaque handle returned by [`nmp_app_chirp_open_group_discovery`].
+pub struct GroupFeedHandle {
+    app: *mut NmpApp,
+    handle: Nip29GroupDiscoveryHandle,
+}
+
+impl GroupFeedHandle {
+    fn close(self) {
+        if self.app.is_null() {
+            return;
+        }
+        // SAFETY: the caller contract requires the owning app to outlive this
+        // handle and close it before `nmp_app_free`.
+        unsafe { &*self.app }.close_nip29_group_discovery_session(self.handle);
+    }
 }
 
 /// Open a NIP-29 group-events read view for one group + kind set into `app`.
@@ -91,8 +136,14 @@ pub extern "C" fn nmp_app_chirp_register_group_events(
         return;
     };
 
-    // Thin-shell rule: parse C string, delegate to the hydrating composer.
-    app_ref.open_group_events(request.group, request.kinds);
+    if let Some(prior) = forget_group_events(app) {
+        app_ref.close_nip29_group_events_session(prior);
+    }
+    let handle = app_ref.open_nip29_group_events_session(Nip29GroupEventsSession::new(
+        request.group,
+        request.kinds,
+    ));
+    remember_group_events(app, handle);
 }
 
 /// Tear down the NIP-29 group-events read view opened by
@@ -110,7 +161,9 @@ pub extern "C" fn nmp_app_chirp_unregister_group_events(app: *mut NmpApp) {
     }
     // SAFETY: caller guarantees `app` is a valid pointer from `nmp_app_new`.
     let app_ref = unsafe { &*app };
-    app_ref.close_group_events();
+    if let Some(handle) = forget_group_events(app) {
+        app_ref.close_nip29_group_events_session(handle);
+    }
 }
 
 /// Open a NIP-29 group-discovery session for one host relay.
@@ -146,8 +199,9 @@ pub extern "C" fn nmp_app_chirp_open_group_discovery(
         return std::ptr::null_mut();
     };
 
-    // Thin-shell rule: parse C string, delegate to the hydrating composer.
-    Box::into_raw(Box::new(open_group_discovery_handle(app_ref, relay_url)))
+    let handle =
+        app_ref.open_nip29_group_discovery_session(Nip29GroupDiscoverySession::new(relay_url));
+    Box::into_raw(Box::new(GroupFeedHandle { app, handle }))
 }
 
 /// Close a NIP-29 group-discovery session opened by
@@ -171,5 +225,5 @@ pub extern "C" fn nmp_app_chirp_close_group_discovery(handle: *mut GroupFeedHand
     // down the interest + observer + projection (the app it references must
     // still be alive — the caller's documented contract).
     let handle = unsafe { *Box::from_raw(handle) };
-    unsafe { handle.close() };
+    handle.close();
 }

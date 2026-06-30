@@ -23,17 +23,16 @@
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::{Arc, Mutex};
 
-use nmp_app_chirp::ffi::nmp_app_chirp_register_dm_inbox;
-use nmp_core::{ActorMail, CommandSender};
-use nmp_core::actor::{ActorCommand};
-use nmp_core::actor::{SignCommand};
-use nmp_store::{RawEvent, VerifiedEvent};
-use nmp_core::substrate::IngestParser;
-use nmp_ffi::{
-    nmp_app_free, nmp_app_inject_signed_event_json, nmp_app_new, nmp_app_signin_nsec, nmp_app_start,
+use nmp_app_chirp::ffi::{
+    nmp_app_chirp_register_dm_inbox, nmp_app_free, nmp_app_new, nmp_app_signin_nsec, nmp_app_start,
     NmpApp,
 };
+use nmp_core::actor::ActorCommand;
+use nmp_core::actor::SignCommand;
+use nmp_core::substrate::IngestParser;
+use nmp_core::{ActorMail, CommandSender};
 use nmp_nip17::{DmInboxProjection, DmInboxSnapshot};
+use nmp_store::{RawEvent, VerifiedEvent};
 use nostr::nips::nip19::ToBech32;
 use nostr::{EventBuilder, Keys, Kind, PublicKey, Tag, Timestamp};
 
@@ -255,11 +254,10 @@ fn dm_inbox_full_round_trip_through_ffi() {
     // Inject the verbatim signed event. The actor ingests it, the DmInboxProjection
     // IngestParser fires, and the two `Nip44DecryptForAccount` commands resolve
     // INLINE on the actor thread (Bob is local) — landing the message.
-    let json_cstr = CString::new(envelope_json.as_str()).expect("envelope JSON must be NUL-free");
-    let ok = nmp_app_inject_signed_event_json(app, json_cstr.as_ptr());
+    let ok = unsafe { &*app }.inject_signed_event_json_for_test(&envelope_json);
     assert!(
         ok,
-        "nmp_app_inject_signed_event_json must return true for a valid gift-wrap envelope",
+        "signed gift-wrap envelope must inject through native-runtime test support",
     );
 
     // Give the actor thread time to drain the ingest + decrypt port chain.

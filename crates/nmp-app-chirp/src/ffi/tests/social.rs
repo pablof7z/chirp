@@ -8,11 +8,11 @@
 //! bindings — under the `"nmp.follow_list"` key but the distinct
 //! `"nmp.nip02.follow_list"` schema_id.
 
-use nmp_ffi::{nmp_app_free, nmp_app_new};
+use super::super::{nmp_app_free, nmp_app_new};
 
 use super::super::nmp_app_chirp_unregister;
-use nmp_nip02::typed_projection_entry as follow_list_typed_projection;
 use super::helpers::{dispatch, register_app};
+use nmp_nip02::typed_projection_entry as follow_list_typed_projection;
 
 /// THE MIGRATION PROOF: after `nmp_app_chirp_register`, the public social
 /// verbs are reachable through the typed byte doorway — each returns an echoed
